@@ -9,6 +9,11 @@ Message API
 - from = the PID of the sender
 - to = the PID of the intended receiver of the reply
 - reason = atom describing nature of failure
+	space_occupied
+	out_of_bounds
+	target_lost
+	invalid_target
+	error
 
 
 
@@ -31,11 +36,11 @@ Message API
 
 - {move_herbivore, from}
 	{moved_herbivore, from}
-	{failed_move_herbivore, from}
+	{failed_move_herbivore, reason, from}
 
 - {move_carnivore, from}
 	{moved_carnivore, from}
-	{failed_move_carnivore, from}
+	{failed_move_carnivore, reason, from}
 
 
 // Feeding
