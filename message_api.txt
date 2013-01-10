@@ -1,0 +1,49 @@
+Message API
+
+
+// Legend
+
+- plant = primary lifeform
+- herbivore = secondary lifeform
+- carnivore = tertiary lifeform
+- from = the PID of the sender
+- to = the PID of the intended receiver of the reply
+- reason = atom describing nature of failure
+
+
+
+// Reproduction
+
+- {spawn_plant, from}
+	{spawned_plant, from}
+	{failed_spawn_plant, reason, from}
+
+- {spawn_herbivore, from}
+	{spawned_herbivore, from}
+	{failed_spawn_herbivore, reason, from}
+
+- {spawn_carnivore, from}
+	{spawned_herbivore, from}
+	{failed_spawn_carnivore, reason, from}
+
+
+// Movement
+
+- {move_herbivore, from}
+	{moved_herbivore, from}
+	{failed_move_herbivore, from}
+
+- {move_carnivore, from}
+	{moved_carnivore, from}
+	{failed_move_carnivore, from}
+
+
+// Feeding
+
+- {eat_grass, from}
+	{ate_grass, from}
+	{failed_eat_grass, reason, from}
+
+- {eat_herbivore, from}
+	{ate_herbivore, from}
+	{failed_eat_herbivore, reason, from}
