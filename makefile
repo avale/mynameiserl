@@ -8,11 +8,12 @@ ERL_FILES= src/*.erl
 BEAM_FILES= bin/*.beam
 
 BEAM_DIR= /bin
+ERL_DIR= /src
 
 all: clean compile
 
 compile: 
-	$(ERLC) $(ERLCFLAGS) $(BEAM_DIR) &ERL_FILES
+	$(ERLC) $(ERLCFLAGS) $(BEAM_DIR) $(ERL_FILES)
 
 clean:
 	rm -f $(BEAM_FILES)
