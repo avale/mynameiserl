@@ -36,8 +36,8 @@ handle_info(Info, State) ->
 		{eat_grass, From} ->
 			From ! gen_server:call(?MODULE, eat_grass);
 		{eat_herbivore, From} ->
-			From ! gen_server:call(?MODULE, eat_herbivore);
-	end
+			From ! gen_server:call(?MODULE, eat_herbivore)
+	end,
 	{noreply, State}.
 
 terminate(_Reason, _State) ->

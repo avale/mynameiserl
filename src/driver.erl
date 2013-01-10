@@ -9,6 +9,6 @@ init() ->
 loop() ->
 	receive 
 		_ -> 
-			io:format("Jak ar en gnu")
+			io:format("Jak ar en gnu ~n")
 	end,
 	driver:loop().

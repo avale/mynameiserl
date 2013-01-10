@@ -7,8 +7,8 @@ ERL_FlAGS= -noshell -s
 ERL_FILES= src/*.erl
 BEAM_FILES= bin/*.beam
 
-BEAM_DIR= /bin
-ERL_DIR= /src
+BEAM_DIR= bin/
+ERL_DIR= src/
 
 all: clean compile
 
