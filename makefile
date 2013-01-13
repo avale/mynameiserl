@@ -1,6 +1,8 @@
 ERLC=erlc
 ERLCFLAGS=-o
-ERL=erl
+ERL= erl
+
+MV= cd bin
 
 ERL_FlAGS= -noshell -s
 
@@ -9,6 +11,7 @@ BEAM_FILES= bin/*.beam
 
 BEAM_DIR= bin/
 ERL_DIR= src/
+
 
 all: clean compile
 
