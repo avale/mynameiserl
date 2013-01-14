@@ -18,15 +18,15 @@ start_cell(Coordinates, C, R, Color) ->
 %% ====================================================================
 
 init([Coordinates, C, R, Color]) ->
-	%Type = empty,
+	Type = empty,
 	Nbr = sur_nodes(Coordinates,C,R),
 	{X,Y} = Coordinates,
 	case Color of	
-		1 -> Code = "#1E5B2D"; %Turf
+		1 -> Code = "#1E5B2D"; %Plant
 		2 -> Code = "#EAD8E9"; %Rabbit
 		3 -> Code = "#933F17"; %Fox
 		_ -> Code = "#867754" %Empty
-	end
+	end,
 	frame ! {change_cell, X,Y, Code},
 	{ok,[Coordinates,Nbr,Type]}.
 
