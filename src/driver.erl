@@ -4,7 +4,7 @@
 
 init() ->
 	frame:init(),
-	register(driver, spawn(?MODULE, loop, [])).
+	register(driver, spawn(?MODULE, loop, [[]])).
 
 
 parse_binary_inner(<<>>,Ack,_,_) -> Ack;
@@ -33,16 +33,20 @@ spawn_game([{Xe,Ye,C}|T], W, H) ->
 	entity:start_cell({Xe,Ye},W,H,C),
 	spawn_game(T,W,H).
 
-loop() ->
+loop(L) ->
 	receive 
-		{start, File, W, H} -> 
+		{set_up, File, W, H} -> 
 			{ok, Binary} = file:read_file(File),
 			Entities = parse_binary(Binary,W),
-			spawn_game(Entities, W, H);
+			spawn_game(Entities, W, H),
+			driver:loop(Entities);
+		{start} ->
+			register(clock, spawn(?MODULE, tick, [L])),
+			driver:loop(L);
 		_ ->
 			io:format("Driver: Undefined message~n",[])
 	end,
-	driver:loop().
+	driver:loop(L).
 
 
 %% ====================================================================
@@ -69,3 +73,19 @@ read(InputFileName) ->
     Data = read_lines(Device, ""),
     close_file(Device),
     lists:reverse(Data).
+
+
+%% ====================================================================
+%% Simulation tic-toc clock timer
+%% ====================================================================
+
+tick(L) ->
+	lists:map((fun (X) -> timer:send_after(1000000, X, tick) end), L),
+	timer:sleep(1000000),
+	tock(L).
+
+
+tock(L) ->
+	lists:map((fun (X) -> timer:send_after(1000000, X, tick) end), L),
+	timer:sleep(1000000),
+	tick(L).

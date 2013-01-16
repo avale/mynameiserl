@@ -1,4 +1,5 @@
 -module(entity).
+-include("entity.hrl").
 %-export([start_cell/3]).
 -compile([export_all]).
 -behaviour(gen_server).
@@ -18,18 +19,17 @@ start_cell(Coordinates, C, R, Color) ->
 %% ====================================================================
 
 init([Coordinates, C, R, Color]) ->
-	Type = empty,
 	Nbr = sur_nodes(Coordinates,C,R),
 	{X,Y} = Coordinates,
 	case Color of	
-		1 -> Code = "#1E5B2D"; %Plant
-		2 -> Code = "#EAD8E9"; %Rabbit
-		3 -> Code = "#933F17"; %Fox
-		-1 -> Code = "#463E41"; %Barrier
-		_ -> Code = "#867754" %Empty
+		1 -> Code = "#1E5B2D", State = #plant{hex = Code, _ = '_'};
+		2 -> Code = "#EAD8E9", State = #herbivore{hex = Code, _ = '_'};
+		3 -> Code = "#933F17", State = #carnivore{hex = Code, _ = '_'};
+		-1 -> Code = "#463E41", State = #barrier{hex = Code, _ = '_'};
+		_ -> Code = "#867754", State = #empty{hex = Code, _ = '_'}
 	end,
 	frame ! {change_cell, X,Y, Code},
-	{ok,[Coordinates,Nbr,Type]}.
+	{ok,[Coordinates,Nbr,State]}.
 
 handle_call(_, _From, State) ->
 	{reply, ok, State}.
@@ -39,6 +39,10 @@ handle_cast(_, State) ->
 
 handle_info(Info, State) ->
 	case Info of
+		{tick, From} ->
+			ok;
+		{tock, From} ->
+			ok;
 		{spawn_plant, From} ->
 			From ! gen_server:call(self(), spawn_plant);
 		{spawn_herbivore, From} ->
