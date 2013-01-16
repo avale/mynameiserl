@@ -15,7 +15,8 @@ parse_binary_inner(<<Byte:8, Rest/binary>>, Ack, X, Y) ->
 		72 -> parse_binary_inner(Rest, [{X,Y,2}|Ack], X+1, Y);
 		67 -> parse_binary_inner(Rest, [{X,Y,3}|Ack], X+1, Y);
 		101 -> parse_binary_inner(Rest, [{X,Y,0}|Ack], X+1, Y);
-		66 -> parse_binary_inner(Rest, [{X,Y,-1}|Ack], X+1, Y)
+		35 -> parse_binary_inner(Rest, [{X,Y,-1}|Ack], X+1, Y);
+		_ -> parse_binary_inner(Rest, Ack, X+1, Y)
 	end.
 
 parse_binary_outer(<<>>, Ack, _, _) -> Ack;
@@ -27,6 +28,7 @@ parse_binary_outer(Board, Ack, Y, W) ->
 parse_binary(Binary,W) ->
 	parse_binary_outer(Binary,[],0,W).
 
+spawn_game([], _W, _H) -> ok;
 spawn_game([{Xe,Ye,C}|T], W, H) ->
 	entity:start_cell({Xe,Ye},W,H,C),
 	spawn_game(T,W,H).

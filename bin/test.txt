@@ -1,6 +1,6 @@
-bbbbbbbbbb
-beeeeTeeeb
-beHeeeeHeb
-bTeeeTeeeb
-bHeeTeeCeb
-bbbbbbbbbb
+##########
+#eeeeTeee#
+#eHeeeeHe#
+#TeeeTeee#
+#HeeTeeCe#
+##########

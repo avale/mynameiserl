@@ -25,6 +25,7 @@ init([Coordinates, C, R, Color]) ->
 		1 -> Code = "#1E5B2D"; %Plant
 		2 -> Code = "#EAD8E9"; %Rabbit
 		3 -> Code = "#933F17"; %Fox
+		-1 -> Code = "#463E41"; %Barrier
 		_ -> Code = "#867754" %Empty
 	end,
 	frame ! {change_cell, X,Y, Code},
