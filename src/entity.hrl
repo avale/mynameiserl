@@ -14,3 +14,6 @@
 
 %% State of an empty cell
 -record(empty, {hex="#FFFFFF"}).
+
+%% State...
+-record(life, {plant=#empty{}, animal=#empty{}}).

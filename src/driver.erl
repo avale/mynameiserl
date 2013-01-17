@@ -82,14 +82,16 @@ read(InputFileName) ->
 %% ====================================================================
 
 tick(L) ->
-	io:format("DING~n",[]),
-	lists:map((fun (X) -> timer:send_after(1000, X, tick) end), L),
+	lists:map((fun ({X,Y,_}) ->
+		timer:send_after(1000, list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y)),
+			{tick}) end), L),
 	timer:sleep(1000),
 	tock(L).
 
 
 tock(L) ->
-	io:format("DONG~n",[]),
-	lists:map((fun (X) -> timer:send_after(1000, X, tick) end), L),
+	lists:map((fun ({X,Y,_}) ->
+		timer:send_after(1000, list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y)),
+			{tock}) end), L),
 	timer:sleep(1000),
 	tick(L).

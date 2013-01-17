@@ -113,8 +113,8 @@ init_frame() ->
 default_setup() ->
     set_w(20),
     set_h(10),
-    set_head("Simple stupid frame"),
-    set_foot("Dummies: 20 - Smarties: 0").
+    set_head("Simple smart pasture"),
+    set_foot("Copy pasture").
 
 cellpadding() ->
     10.
