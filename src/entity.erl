@@ -34,6 +34,8 @@ init([Coordinates, C, R, Color]) ->
 handle_call(_, _From, State) ->
 	{reply, ok, State}.
 
+handle_cast(stop, State) ->
+	{stop, shutdown, State};
 handle_cast(_, [Coordinates,Nbr,State]) ->
 	{noreply, [Coordinates,Nbr,State]}.
 
@@ -155,7 +157,9 @@ handle_info(Info, [Coordinates,Nbr,State]) ->
 	end,
 	{noreply, [Coordinates,Nbr,NewState]}.
 
-terminate(_Reason, _State) ->
+terminate(_Reason, State) ->
+	{X,Y} = hd(State),
+	frame ! {change_cell, X, Y, pink}, 
 	ok.
 
 code_change(_OldVsn, State, _Extra) ->
