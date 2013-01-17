@@ -180,7 +180,8 @@ draw_frame(Head, Foot, Body) ->
       {html, [], 
        [{head, [],
          [{title, [], Head},
-          {meta, [{'http-equiv',refresh},{content,1}], []}]},
+          {meta, [{'http-equiv',refresh},{content,1}], []},
+          {link, [{'type','text/css'},{'rel','stylesheet'},{'href','style.css'}], []}]},
         [Body, {p, [], Foot}]]}}].
 
 draw_table(W, H, Data) ->

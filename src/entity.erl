@@ -59,24 +59,24 @@ handle_info(Info, [Coordinates,Nbr,State]) ->
 						plant ->
 							OldAge = Plant#plant.age,
 							NewPlant = Plant#plant{age=OldAge+1},
-							NewState = State#life{plant=NewPlant},
 							Age = Plant#plant.age,
 							io:format("Age: ~p~n",[Age]);
 						_ ->
-							NewState = State,
+							NewPlant = Plant#empty{},
 							ok
-					end
-					%case AnimalType of
-					%	herbivore ->
-					%		NewState = State,
-					%		ok;
-					%	carnivore ->
-					%		NewState = State,
-					%		ok;
-					%	_ ->
-					%		NewState = State,
-					%		ok
-					%end
+					end,
+					case AnimalType of
+						herbivore ->
+							NewAnimal = Animal#herbivore{},
+							ok;
+						carnivore ->
+							NewAnimal = Animal#carnivore{},
+							ok;
+						_ ->
+							NewAnimal = Animal#empty{},
+							ok
+					end,
+					NewState = State#life{plant=NewPlant, animal=NewAnimal}
 			end,
 			ok;
 		{tock} ->
