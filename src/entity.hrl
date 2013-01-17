@@ -16,4 +16,4 @@
 -record(empty, {hex="#FFFFFF"}).
 
 %% State...
--record(life, {plant=#empty{}, animal=#empty{}}).
+-record(life, {plant, animal}).

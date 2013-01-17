@@ -22,9 +22,9 @@ init([Coordinates, C, R, Color]) ->
 	Nbr = sur_nodes(Coordinates,C,R),
 	{X,Y} = Coordinates,
 	case Color of
-		1 -> Code = "#1E5B2D", Type = #plant{hex = Code, age = 0, growth = 4, _ = '_'};
-		2 -> Code = "#EAD8E9", Type = #herbivore{hex = Code, _ = '_'};
-		3 -> Code = "#933F17", Type = #carnivore{hex = Code, _ = '_'};
+		1 -> Code = "#1E5B2D", Type = #life{plant=#plant{hex = Code, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
+		2 -> Code = "#EAD8E9", Type = #life{plant=#empty{}, animal=#herbivore{hex = Code, _ = '_'}};
+		3 -> Code = "#933F17", Type = #life{plant=#empty{}, animal=#carnivore{hex = Code, _ = '_'}};
 		-1 -> Code = "#463E41", Type = #barrier{hex = Code, _ = '_'};
 		_ -> Code = "#867754", Type = #empty{hex = Code, _ = '_'}
 	end,
@@ -42,62 +42,94 @@ handle_info(Info, [Coordinates,Nbr,State]) ->
 	case Info of
 		{tick} ->
 			{X,Y} = Coordinates,
-			T = element(1, State),
-			case T of
+			Type = element(1, State),
+			case Type of
 				empty ->
 					NewState = State,
 					ok;
-				plant ->
-					OldAge = State#plant.age,
-					NewState = State#plant{age=OldAge+1},
-					Age = NewState#plant.age,
-					io:format("Age: ~p~n",[Age]);
-				herbivore ->
+				barrier ->
 					NewState = State,
 					ok;
-				carnivore ->
-					NewState = State,
-					ok;
-				_ ->
-					NewState = State,
-					ok
+				life ->
+					Plant = State#life.plant,
+					PlantType = element(1, Plant),
+					Animal = State#life.animal,
+					AnimalType = element(1, Animal),
+					case PlantType of
+						plant ->
+							OldAge = Plant#plant.age,
+							NewPlant = Plant#plant{age=OldAge+1},
+							NewState = State#life{plant=NewPlant},
+							Age = Plant#plant.age,
+							io:format("Age: ~p~n",[Age]);
+						_ ->
+							NewState = State,
+							ok
+					end
+					%case AnimalType of
+					%	herbivore ->
+					%		NewState = State,
+					%		ok;
+					%	carnivore ->
+					%		NewState = State,
+					%		ok;
+					%	_ ->
+					%		NewState = State,
+					%		ok
+					%end
 			end,
 			ok;
 		{tock} ->
 			{X,Y} = Coordinates,
-			T = element(1, State),
-			case T of
+			Type = element(1, State),
+			case Type of
 				empty ->
 					NewState = State,
 					ok;
-				plant ->
-					Age = State#plant.age,
-					Growth = State#plant.growth,
+				barrier ->
 					NewState = State,
-					case (Age rem Growth) of
-						0 ->
-							Victim = lists:nth(random:uniform(8), Nbr),
-							Victim ! {spawn_plant, self()},
-							frame ! {change_cell, X, Y, "#FF0000"};
+					ok;
+				life ->
+					Plant = State#life.plant,
+					PlantType = element(1, Plant),
+					Animal = State#life.animal,
+					AnimalType = element(1, Animal),
+					case PlantType of
+						plant ->
+							Age = Plant#plant.age,
+							Growth = Plant#plant.growth,
+							NewState = State,
+							case (Age rem Growth) of
+								0 ->
+									random:seed(now()),
+									Victim = lists:nth(random:uniform(8), Nbr),
+									Victim ! {spawn_plant, self()},
+									frame ! {change_cell, X, Y, "#FF0000"};
+								_ ->
+									frame ! {change_cell, X, Y, "#00FF00"}
+							end;
 						_ ->
-							frame ! {change_cell, X, Y, "#00FF00"}
-					end;
-				herbivore ->
-					NewState = State,
-					ok;
-				carnivore ->
-					NewState = State,
-					ok;
-				_ ->
-					NewState = State,
-					ok
+							NewState = State,
+							ok
+					end
+					%case Animal of
+					%	herbivore ->
+					%		NewState = State,
+					%		ok;
+					%	carnivore ->
+					%		NewState = State,
+					%		ok;
+					%	_ ->
+					%		NewState = State,
+					%		ok
+					%end
 			end,
 			ok;
 		{spawn_plant, From} ->
 			case element(1, State) of
 				empty ->
 					Code = "#1E5B2D", 
-					NewState = #plant{hex = Code, age = 0, growth = 4, _ = '_'};
+					NewState = #life{plant=#plant{hex = Code, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
 				_ ->
 					NewState = State,
 					ok
