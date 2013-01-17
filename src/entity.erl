@@ -8,27 +8,27 @@
 %% External functions
 %% ====================================================================
 
-start_cell(Coordinates, C, R, Color) ->
+start_cell(Coordinates, C, R, T) ->
 	{X, Y} = Coordinates,
 	Name = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y)),
 	io:format("Hej: ~p~n",[Name]),
-	gen_server:start_link({local,Name},?MODULE,[Coordinates, C, R, Color],[]).
+	gen_server:start_link({local,Name},?MODULE,[Coordinates, C, R, T],[]).
 
 %% ====================================================================
 %% callback functions
 %% ====================================================================
 
-init([Coordinates, C, R, Color]) ->
+init([Coordinates, C, R, T]) ->
 	Nbr = sur_nodes(Coordinates,C,R),
 	{X,Y} = Coordinates,
-	case Color of
-		1 -> Code = "#1E5B2D", Type = #life{plant=#plant{hex = Code, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
-		2 -> Code = "#EAD8E9", Type = #life{plant=#empty{}, animal=#herbivore{hex = Code, _ = '_'}};
-		3 -> Code = "#933F17", Type = #life{plant=#empty{}, animal=#carnivore{hex = Code, _ = '_'}};
-		-1 -> Code = "#463E41", Type = #barrier{hex = Code, _ = '_'};
-		_ -> Code = "#867754", Type = #empty{hex = Code, _ = '_'}
+	case T of
+		1 -> Class = "plant", Type = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
+		2 -> Class = "herbivore", Type = #life{plant=#empty{}, animal=#herbivore{class = Class, _ = '_'}};
+		3 -> Class = "carnivore", Type = #life{plant=#empty{}, animal=#carnivore{class = Class, _ = '_'}};
+		-1 -> Class = "barrier", Type = #barrier{class = Class, _ = '_'};
+		_ -> Class = "empty", Type = #empty{class = Class, _ = '_'}
 	end,
-	frame ! {change_cell, X,Y, Code},
+	frame ! {change_cell, X,Y, Class},
 	{ok,[Coordinates,Nbr,Type]}.
 
 handle_call(_, _From, State) ->
@@ -106,9 +106,9 @@ handle_info(Info, [Coordinates,Nbr,State]) ->
 									random:seed(now()),
 									Victim = lists:nth(random:uniform(8), Nbr),
 									Victim ! {spawn_plant, self()},
-									frame ! {change_cell, X, Y, "#FF0000"};
+									frame ! {change_cell, X, Y, "plant"};
 								_ ->
-									frame ! {change_cell, X, Y, "#00FF00"}
+									ok
 							end;
 						_ ->
 							NewState = State,
@@ -130,8 +130,8 @@ handle_info(Info, [Coordinates,Nbr,State]) ->
 		{spawn_plant, From} ->
 			case element(1, State) of
 				empty ->
-					Code = "#1E5B2D", 
-					NewState = #life{plant=#plant{hex = Code, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
+					Class = "plant", 
+					NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
 				_ ->
 					NewState = State,
 					ok

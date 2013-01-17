@@ -1,19 +1,19 @@
 %% Entity header file
 
 %% State of a plant cell
--record(plant, {hex="#FFFFFF", age=0, growth, food}).
+-record(plant, {class="#FFFFFF", age=0, growth, food}).
 
 %% State of a herivore cell
--record(herbivore, {hex="#FFFFFF", age=0, growth, speed, hunger=0, vision, food}).
+-record(herbivore, {class="#FFFFFF", age=0, growth, speed, hunger=0, vision, food}).
 
 %% State of a carnivore cell
--record(carnivore, {hex="#FFFFFF", age=0, growth, speed, hunger=0, vision}).
+-record(carnivore, {class="#FFFFFF", age=0, growth, speed, hunger=0, vision}).
 
 %% State of a barrier cell
--record(barrier, {hex="#FFFFFF"}).
+-record(barrier, {class="#FFFFFF"}).
 
 %% State of an empty cell
--record(empty, {hex="#FFFFFF"}).
+-record(empty, {class="#FFFFFF"}).
 
 %% State...
 -record(life, {plant, animal}).

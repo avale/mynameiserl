@@ -181,8 +181,7 @@ draw(Head, Foot, W, H, Data) ->
                draw_table(W, H, Data)).
 
 draw_frame(Head, Foot, Body) ->
-    %%Style = "http://avale.se/style.css",
-    Style = "file:///"++(filename:absname("style.css")),
+    Style = "http://avale.se/mynameiserl/style.css",
     [{ehtml,
       {html, [], 
        [{head, [],
@@ -216,6 +215,6 @@ draw_item(X, Y, Data) ->
         none ->
             {td, ["?"]};
         {value, Color} ->
-            {td, [{bgcolor, Color}]}
+            {td, [{class, Color}]}
     end.
                 
