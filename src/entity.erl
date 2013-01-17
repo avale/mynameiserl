@@ -98,7 +98,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 							random:seed(now()),
 							Victim = lists:nth(random:uniform(length(Aval)), Aval),
 							NewAction = {goto, Victim},
-							io:format("[PLING] JAG VIIIILLL TIIIILL ~p~n",[Victim])
+							io:format("[~p|PLING]: JAG VIIIILLL TIIIILL ~p~n",[Coordinates,Victim])
 					end,
 					NewAnimal = Animal#herbivore{},
 					ok;
@@ -149,9 +149,16 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 				herbivore ->
 					case Action of
 						{goto, Target} ->
-							io:format("[PLONG]: JAG GAAAAAAR TIIIILL ~p~n",[Target]),
-							NewState = State#life{animal = gen_server:call(Target, {move_herbivore, Animal})},
-							New = NewState#life.animal,
+							io:format("[~p|PLONG]: JAG GAAAAAAR TIIIILL ~p~n",[Coordinates,Target]),
+							NewAnimal = gen_server:call(Target, {move_herbivore, Animal})},
+							case element(1, State#life.plant) of
+								plant ->
+									NewState = State#life{animal= NewAnimal},
+									New = "plant";
+								_ -> 
+									NewState = #empty{"empty", _ = '_'},
+									New = "empty"
+							end
 							frame ! {change_cell, X, Y, element(1, New)};
 						{none, _} ->
 							NewState = State
