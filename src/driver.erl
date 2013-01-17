@@ -90,8 +90,10 @@ tock(L) ->
 
 tick_new(L) ->
         timer:sleep(2000),
-        lists:map((fun (X) -> gen_server:cast(X, tick) end), L).
+        lists:map((fun (X) -> gen_server:cast(X, tick) end), L),
+        tock_new(L).
 
 tock_new(L) ->
         timer:sleep(2000),
-        lists:map((fun (X) -> gen_server:cast(X, tock) end), L).
+        lists:map((fun (X) -> gen_server:cast(X, tock) end), L),
+        tick_new(L).

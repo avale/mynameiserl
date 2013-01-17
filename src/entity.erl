@@ -35,22 +35,30 @@ init([Coordinates, C, R, T]) ->
 
 
 
-handle_call({move_herbivore, Animal}, _From, [Coordinates,_Nbr,State|_T]) ->
+handle_call({move_herbivore, Animal}, _From, [Coordinates, Nbr, State, T]) ->
 	{X,Y} = Coordinates,
-	Reply = State#life.animal,
-	frame ! {change_cell, X, Y, element(1, Animal)},
-	{reply, Reply, [Coordinates,_Nbr,State#life{animal= Animal}]};
-handle_call(is_notAnimal, _From, [_Coordinates,_Nbr,State|_T]) ->
+	Type = element(1, State),
+	case Type of
+		life ->
+			Reply = State#life.animal,
+			NewState = State#life{animal = Animal};
+		_ ->
+			Reply = State#empty{},
+			NewState = #life{animal=Animal, plant=#empty{}}
+	end,
+	frame ! {change_cell, X, Y, "herbivore"},
+	{reply, Reply, [Coordinates, Nbr,NewState, T]};
+handle_call(is_notAnimal, _From, [Coordinates,Nbr,State|T]) ->
 	case Type = element(1, State) of
-		empty -> Reply = true;
+		empty -> Reply = self();
 		barrier -> Reply = false;
 		life -> 
 			case State#life.animal of
-				empty -> Reply = true;
+				empty -> Reply = self();
 				_ -> Reply = false
 			end
 	end,
-	{reply, Reply, State}.
+	{reply, Reply, [Coordinates,Nbr,State|T]}.
 
 handle_cast(stop, State) ->
 	{stop, shutdown, State};
@@ -74,16 +82,14 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			case PlantType of
 				plant ->
 					OldAge = Plant#plant.age,
-					NewPlant = Plant#plant{age=OldAge+1},
-					Age = Plant#plant.age,
-					io:format("Age: ~p~n",[Age]);
+					NewPlant = Plant#plant{age=OldAge+1};
 				_ ->
 					NewPlant = Plant#empty{},
 					ok
 			end,
 			case AnimalType of
 				herbivore ->
-					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal) end, Nbr), Bool =:= true],
+					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal) end, Nbr), Bool =/= false],
 					case Aval of
 						[] ->
 							NewAction = Action,
@@ -91,7 +97,8 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 						_ -> 
 							random:seed(now()),
 							Victim = lists:nth(random:uniform(length(Aval)), Aval),
-							NewAction = {goto, Victim} 
+							NewAction = {goto, Victim},
+							io:format("[PLING] JAG VIIIILLL TIIIILL ~p~n",[Victim])
 					end,
 					NewAnimal = Animal#herbivore{},
 					ok;
@@ -127,27 +134,25 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 				plant ->
 					Age = Plant#plant.age,
 					Growth = Plant#plant.growth,
-					NewState = State,
 					case (Age rem Growth) of
 						0 ->
 							random:seed(now()),
 							Victim = lists:nth(random:uniform(8), Nbr),
-							Victim ! {spawn_plant, self()},
-							frame ! {change_cell, X, Y, "#FF0000"};
+							gen_server:cast(Victim,spawn_plant);
 						_ ->
-							frame ! {change_cell, X, Y, "#00FF00"}
+							ok
 					end;
 				_ ->
-					NewState = State,
 					ok
 			end,
 			case AnimalType of
 				herbivore ->
 					case Action of
 						{goto, Target} ->
+							io:format("[PLONG]: JAG GAAAAAAR TIIIILL ~p~n",[Target]),
 							NewState = State#life{animal = gen_server:call(Target, {move_herbivore, Animal})},
 							New = NewState#life.animal,
-							frame ! {change_cell, X, Y, New};
+							frame ! {change_cell, X, Y, element(1, New)};
 						{none, _} ->
 							NewState = State
 					end,
@@ -163,17 +168,17 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 	NewAction = {none, empty},
 	{noreply, [Coordinates,Nbr,NewState,NewAction]};
 
-handle_cast(spawn_plant, [{X,Y},_,State|_T]) ->
+handle_cast(spawn_plant, [{X,Y},Nbr,State|T]) ->
 	case element(1, State) of
 		empty ->
-			Code = "#1E5B2D", 
-			NewState = #life{plant=#plant{hex = Code, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
-			frame ! {change_cell,X,Y,Code};
+			Class = "plant", 
+			NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
+			frame ! {change_cell,X,Y,Class};
 		_ ->
 			NewState = State,
 			ok
 	end,
-	{noreply, NewState};
+	{noreply, [{X,Y},Nbr,NewState|T]};
 
 handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 	{noreply, [Coordinates,Nbr,State|_T]}.
@@ -298,7 +303,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 
 terminate(_Reason, State) ->
 	{X,Y} = hd(State),
-	frame ! {change_cell, X, Y, pink}, 
+	frame ! {change_cell, X, Y, "red"}, 
 	ok.
 
 code_change(_OldVsn, State, _Extra) ->
