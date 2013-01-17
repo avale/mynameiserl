@@ -184,7 +184,7 @@ draw_frame(Head, Foot, Body) ->
         [Body, {p, [], Foot}]]}}].
 
 draw_table(W, H, Data) ->
-    {table, [{cellpadding,10},{cellspacing,"0"}], 
+    {table, [{cellpadding,5},{cellspacing,"0"}], 
      draw_rows(0, W, H, Data)}.
 
 draw_rows(Y, _W, H, _Data) when Y==H ->

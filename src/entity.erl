@@ -40,6 +40,8 @@ handle_cast(_, State) ->
 handle_info(Info, State) ->
 	case Info of
 		{tick, From} ->
+			{X,Y} = hd(State),
+			frame ! {change_cell, 1, 1, "#FF0000"},
 			ok;
 		{tock, From} ->
 			ok;

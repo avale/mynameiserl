@@ -36,6 +36,8 @@ spawn_game([{Xe,Ye,C}|T], W, H) ->
 loop(L) ->
 	receive 
 		{set_up, File, W, H} -> 
+			frame:set_w(W),
+			frame:set_h(H),
 			{ok, Binary} = file:read_file(File),
 			Entities = parse_binary(Binary,W),
 			spawn_game(Entities, W, H),
@@ -80,12 +82,14 @@ read(InputFileName) ->
 %% ====================================================================
 
 tick(L) ->
-	lists:map((fun (X) -> timer:send_after(1000000, X, tick) end), L),
-	timer:sleep(1000000),
+	io:format("DING~n",[]),
+	lists:map((fun (X) -> timer:send_after(1000, X, tick) end), L),
+	timer:sleep(1000),
 	tock(L).
 
 
 tock(L) ->
-	lists:map((fun (X) -> timer:send_after(1000000, X, tick) end), L),
-	timer:sleep(1000000),
+	io:format("DONG~n",[]),
+	lists:map((fun (X) -> timer:send_after(1000, X, tick) end), L),
+	timer:sleep(1000),
 	tick(L).
