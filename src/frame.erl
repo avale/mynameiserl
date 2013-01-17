@@ -22,11 +22,16 @@ init() ->
     init_frame(),
     ServerConf =
 	[{port, 8088},
-	 {server_name, "Cellular Automata"},
+	 {server_name, "pasture"},
 	 {bind_address, {127, 0, 0, 1}},
 	 {server_root, "."},
 	 {document_root, "."},
-	 {modules, [?MODULE]}
+	 {modules, [?MODULE]},
+     {mimetypes, [
+         {"css", "text/css"},
+         {"js", "text/javascript"},
+         {"html", "text/html"}
+     ]}
 	],
     {ok, _Pid} = inets:start(httpd, ServerConf, inets),
     {ok, true}.
@@ -176,12 +181,14 @@ draw(Head, Foot, W, H, Data) ->
                draw_table(W, H, Data)).
 
 draw_frame(Head, Foot, Body) ->
+    %%Style = "http://avale.se/style.css",
+    Style = "file:///"++(filename:absname("style.css")),
     [{ehtml,
       {html, [], 
        [{head, [],
          [{title, [], Head},
           {meta, [{'http-equiv',refresh},{content,1}], []},
-          {link, [{'type','text/css'},{'rel','stylesheet'},{'href','style.css'}], []}]},
+          {link, [{'type','text/css'},{'rel','stylesheet'},{'href',Style}], []}]},
         [Body, {p, [], Foot}]]}}].
 
 draw_table(W, H, Data) ->
