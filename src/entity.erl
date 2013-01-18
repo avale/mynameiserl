@@ -276,13 +276,9 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 			NewAction = {none, empty},
 			From ! gen_server:call(self(), eat_herbivore);
 		{move, To} ->
-			case To of
-				no -> 
-					NewState = State,
-					NewAction = {none, empty};
-				_ ->
-					NewState = State,
-					NewAction = {goto, getAdjecentAt(Coordinates,Nbr,To)}
+			io:format("Jag ska till: ~p~n", [To]),
+			NewState = State,
+			NewAction = {goto, getAdjecentAt(Coordinates,Nbr,To)}
 			end;
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
