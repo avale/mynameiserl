@@ -63,7 +63,11 @@ loop(P, E, W, H) ->
                         register(clock, spawn(?MODULE, tick_new, [P])),
                         driver:loop(P,E,W,H);
                 {stop} ->
-                        exit(whereis(clock), kill),
+                        Clock = whereis(clock),
+                        case Clock of
+                                unfedined -> ok;
+                                _ -> exit(Clock, kill)
+                        end,
                         lists:map(fun(X) -> gen_server:cast(X, stop) end, P),
                         driver:loop(P,E,W,H);
                 {step} ->
