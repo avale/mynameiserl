@@ -44,8 +44,15 @@ handle_call({move_herbivore, Animal}, _From, [Coordinates, Nbr, State, T]) ->
 	Type = element(1, State),
 	case Type of
 		life ->
-			Reply = State#life.animal,
-			NewState = State#life{animal = Animal};
+			CurrentAnimal = State#life.animal,
+			case element(1, CurrentAnimal) of
+				empty ->
+					Reply = State#life.animal,
+					NewState = State#life{animal = Animal};
+				_ ->
+					Reply = #barrier{class = "barrier", _ = '_'},
+					NewState = State
+			end;
 		barrier ->
 			Reply = State#barrier{},
 			NewState = State;
