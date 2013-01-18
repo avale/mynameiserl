@@ -12,7 +12,7 @@ start_cell(Coordinates, C, R, T) ->
 	{X, Y} = Coordinates,
 	Name = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y)),
 	io:format("Hej: ~p~n",[Name]),
-	gen_server:start_link({local,Name},?MODULE,[Coordinates, C, R, T],[]).
+	gen_server:start({local,Name},?MODULE,[Coordinates, C, R, T],[]).
 
 %% ====================================================================
 %% callback functions
@@ -29,18 +29,169 @@ init([Coordinates, C, R, T]) ->
 		_ -> Class = "empty", Type = #empty{class = Class, _ = '_'}
 	end,
 	frame ! {change_cell, X,Y, Class},
-	{ok,[Coordinates,Nbr,Type]}.
+	{ok,[Coordinates,Nbr,Type,{none, empty}]}.
 
-handle_call(_, _From, State) ->
-	{reply, ok, State}.
+	
+
+
+
+handle_call({move_herbivore, Animal}, _From, [Coordinates, Nbr, State, T]) ->
+	{X,Y} = Coordinates,
+	Type = element(1, State),
+	case Type of
+		life ->
+			Reply = State#life.animal,
+			NewState = State#life{animal = Animal};
+		_ ->
+			Reply = State#empty{},
+			NewState = #life{animal=Animal, plant=#empty{}}
+	end,
+	frame ! {change_cell, X, Y, "herbivore"},
+	{reply, Reply, [Coordinates, Nbr,NewState, T]};
+handle_call(is_notAnimal, _From, [Coordinates,Nbr,State|T]) ->
+	case Type = element(1, State) of
+		empty -> Reply = self();
+		barrier -> Reply = false;
+		life -> 
+			case State#life.animal of
+				empty -> Reply = self();
+				_ -> Reply = false
+			end
+	end,
+	{reply, Reply, [Coordinates,Nbr,State|T]}.
 
 handle_cast(stop, State) ->
 	{stop, shutdown, State};
-handle_cast(_, [Coordinates,Nbr,State]) ->
-	{noreply, [Coordinates,Nbr,State]}.
+
+handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
+	Type = element(1, State),
+	case Type of
+		empty ->
+			NewState = State,
+			NewAction = Action,
+			ok;
+		barrier ->
+			NewState = State,
+			NewAction = Action,
+			ok;
+		life ->
+			Plant = State#life.plant,
+			PlantType = element(1, Plant),
+			Animal = State#life.animal,
+			AnimalType = element(1, Animal),
+			case PlantType of
+				plant ->
+					OldAge = Plant#plant.age,
+					NewPlant = Plant#plant{age=OldAge+1};
+				_ ->
+					NewPlant = Plant#empty{},
+					ok
+			end,
+			case AnimalType of
+				herbivore ->
+					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal) end, Nbr), Bool =/= false],
+					case Aval of
+						[] ->
+							NewAction = Action,
+							ok;
+						_ -> 
+							random:seed(now()),
+							Victim = lists:nth(random:uniform(length(Aval)), Aval),
+							NewAction = {goto, Victim},
+							io:format("[~p|PLING]: JAG VILL TILL ~p~n",[Coordinates,Victim])
+					end,
+					NewAnimal = Animal#herbivore{},
+					ok;
+				carnivore ->
+					NewAnimal = Animal#carnivore{},
+					NewAction = Action,
+					ok;
+				_ ->
+					NewAnimal = Animal#empty{},
+					NewAction = Action,
+					ok
+			end,
+			NewState = State#life{plant=NewPlant, animal=NewAnimal}
+	end,
+	{noreply, [Coordinates, Nbr, NewState, NewAction]};
+
+handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
+	{X,Y} = Coordinates,
+	Type = element(1, State),
+	case Type of
+		empty ->
+			NewState = State,
+			ok;
+		barrier ->
+			NewState = State,
+			ok;
+		life ->
+			Plant = State#life.plant,
+			PlantType = element(1, Plant),
+			Animal = State#life.animal,
+			AnimalType = element(1, Animal),
+			case PlantType of
+				plant ->
+					Age = Plant#plant.age,
+					Growth = Plant#plant.growth,
+					case (Age rem Growth) of
+						0 ->
+							random:seed(now()),
+							Victim = lists:nth(random:uniform(8), Nbr),
+							gen_server:cast(Victim,spawn_plant);
+						_ ->
+							ok
+					end;
+				_ ->
+					ok
+			end,
+			case AnimalType of
+				herbivore ->
+					case Action of
+						{goto, Target} ->
+							io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
+							NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
+							case element(1, State#life.plant) of
+								plant ->
+									NewState = State#life{animal= NewAnimal},
+									New = "plant";
+								_ -> 
+									NewState = #empty{},
+									New = "empty"
+							end,
+							frame ! {change_cell, X, Y, New};
+						{none, _} ->
+							NewState = State
+					end,
+					ok;
+				carnivore ->
+					NewState = State,
+					ok;
+				_ ->
+					NewState = State,
+					ok 
+			end
+	end,
+	NewAction = {none, empty},
+	{noreply, [Coordinates,Nbr,NewState,NewAction]};
+
+handle_cast(spawn_plant, [{X,Y},Nbr,State|T]) ->
+	case element(1, State) of
+		empty ->
+			Class = "plant", 
+			NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
+			frame ! {change_cell,X,Y,Class};
+		_ ->
+			NewState = State,
+			ok
+	end,
+	{noreply, [{X,Y},Nbr,NewState|T]};
+
+handle_cast(_, [Coordinates,Nbr,State|_T]) ->
+	{noreply, [Coordinates,Nbr,State|_T]}.
 
 
-handle_info(Info, [Coordinates,Nbr,State]) ->
+handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 	case Info of
 		{tick} ->
 			{X,Y} = Coordinates,
@@ -159,7 +310,7 @@ handle_info(Info, [Coordinates,Nbr,State]) ->
 
 terminate(_Reason, State) ->
 	{X,Y} = hd(State),
-	frame ! {change_cell, X, Y, pink}, 
+	frame ! {change_cell, X, Y, "red"}, 
 	ok.
 
 code_change(_OldVsn, State, _Extra) ->
