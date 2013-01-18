@@ -24,13 +24,15 @@ init([Coordinates, C, R, T]) ->
 	case T of
 		1 ->
 			Class = "plant",
-			Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
+			Type = #life{plant=#plant{class = Class, growth = variables:plantGrowth(), age=0, _ = '_'}, animal=#empty{}};
 		2 ->
 			Class = "herbivore",
-			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=40, _ = '_', vision=7}};
+			Type = #life{
+						plant=#empty{},
+						animal=#herbivore{class = Class, age=0, hunger=0, vision=variables:herbivoreVision(), _ = '_', starvation=variables:herbivoreStarvation()}};
 		3 ->
 			Class = "carnivore",
-			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=40, _ = '_', vision=12}};
+			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, age=0, hunger=0, vision=variables:carnivoreVision(), _ = '_', starvation=variables:carnivoreStarvation()}};
 		-1 ->
 			Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ ->
@@ -95,8 +97,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			case PlantType of
 				plant ->
 					OldAge = Plant#plant.age,
-					NewPlant = Plant#plant{age=OldAge+1},
-					io:format("I am weed. I am ~p steps old.~n",[OldAge+1]);
+					NewPlant = Plant#plant{age=OldAge+1};
 				_ ->
 					NewPlant = Plant#empty{},
 					ok
@@ -155,7 +156,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 					case (Age rem Growth) of
 						0 ->
 							random:seed(now()),
-							Victim = lists:nth(random:uniform(8), Nbr),
+							{Victim, _} = lists:nth(random:uniform(8), Nbr),
 							gen_server:cast(Victim,{spawn_plant, Growth});
 						_ ->
 							ok
@@ -182,26 +183,13 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 						_ ->
 							case Action of
 								{goto, Target} ->
+									NewState = State,
 									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
-									NewAnimal = gen_server:cast(Target, {move_animal, Animal, self()}),
-									case element(1, NewAnimal) of
-										barrier ->
-											NewState = State;
-										_->
-											case element(1, State#life.plant) of
-												plant ->
-													NewState = State#life{animal= NewAnimal},
-													New = "plant";
-												_ -> 
-													NewState = #empty{},
-													New = "empty"
-											end,
-											frame ! {change_cell, X, Y, New}
-									end;
+									gen_server:cast(Target, {move_animal, Animal, self()});									
 								{eat,Pid} ->
 									io:format("~p: OMNOMNOMNOM, Weed!", [Coordinates]),
 									gen_server:cast(Pid, {eaten, plant, self()}),
-									NewState = State,
+									NewState = State;
 								{none, _} ->
 									NewState = State
 							end
@@ -225,21 +213,13 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 						_ ->
 							case Action of
 								{goto, Target} ->
+									NewState = State,
 									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
-									NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
-									case element(1, State#life.plant) of
-										plant ->
-											NewState = State#life{animal= NewAnimal},
-											New = "plant";
-										_ -> 
-											NewState = #empty{},
-											New = "empty"
-									end,
-									frame ! {change_cell, X, Y, New};
+									gen_server:cast(Target, {move_animal, Animal, self()});
 								{eat,Pid} ->
 									io:format("~p: OMNOMNOMNOM, Rabbit!", [Coordinates]),
 									gen_server:cast(Pid, {eaten, animal, self()}),
-									NewState = State,
+									NewState = State;
 								{none, _} ->
 									NewState = State
 							end
@@ -256,13 +236,12 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 handle_cast({spawn_plant, ParentGrowth}, [{X,Y},Nbr,State|T]) ->
 	random:seed(now()),
 	NewGrowth = ParentGrowth + (random:uniform(3) - 2), %% GENETICZ
-	case NewGrowth < 1 of
+	case NewGrowth < 2 of
 		true ->
-			Growth = 1;
+			Growth = 2;
 		_ ->
 			Growth = NewGrowth
 	end,
-	io:format("(~p, ~p) My growth is ~p~n", [X, Y, Growth]),
 	case element(1, State) of
 		empty ->
 			Class = "plant",
@@ -272,16 +251,99 @@ handle_cast({spawn_plant, ParentGrowth}, [{X,Y},Nbr,State|T]) ->
 			NewState = State,
 			ok;
 		_ -> 
-			Class = element(1, State#life.animal),
 			NewState = State#life{plant=#plant{class = "plant", age = 0, growth = Growth, _ = '_'}}
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
+handle_cast({spawn_animal, Animal}, [{X,Y},Nbr,State|T]) ->
+	StateType = element(1, State),
+	AnimalType = element(1, Animal),
+	case StateType of
+		barrier ->
+			NewState = State;
+		empty ->	
+			case AnimalType of
+				herbivore ->
+					ParentVision = Animal#herbivore.vision,
+					ParentStarvation = Animal#herbivore.starvation,
+					{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
+					NewState = #life{plant=#empty{}, animal=#herbivore{class="herbivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+					frame ! {change_cell,X,Y,"herbivore"};
+				carnivore ->
+					ParentVision = Animal#carnivore.vision,
+					ParentStarvation = Animal#carnivore.starvation,
+					{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
+					NewState = #life{plant=#empty{}, animal=#carnivore{class="carnivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+					frame ! {change_cell,X,Y,"carnivore"};
+				_ ->
+					NewState = State,
+					io:format("What is this animal? Is this dog?~n")
+			end;
+		life ->
+			case element(1, State#life.animal) of
+				empty ->
+					case AnimalType of
+						herbivore ->
+							ParentVision = Animal#herbivore.vision,
+							ParentStarvation = Animal#herbivore.starvation,
+							{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
+							NewState = #life{animal=#herbivore{class="herbivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+							frame ! {change_cell,X,Y,"herbivore"};
+						carnivore ->
+							ParentVision = Animal#carnivore.vision,
+							ParentStarvation = Animal#carnivore.starvation,
+							{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
+							NewState = #life{animal=#carnivore{class="carnivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+							frame ! {change_cell,X,Y,"carnivore"};
+						_ ->
+							NewState = State,
+							io:format("What is this animal? Is this dog?~n")
+					end;
+				_ ->
+					NewState = State
+			end;
+		_ ->
+			NewState = State,
+			io:format("(spawn_animal) I am neither barrier nor life nor empty... What am I?!~n")
+	end,
+	{noreply, [{X,Y},Nbr,NewState|T]};
+
+handle_cast({eaten, Type, From}, [Coor,Nbr,State,Action]) ->
+	case element(1, State) of
+		life ->
+			case Type of
+				herbivore ->
+					io:format("Fuck you kompis! Ät honom ->"),
+					NewAction = {none, empty},
+					NewState = State#life{animal= #empty{}},
+					broadcast(Nbr,element(1, State#life.plant),Coor),
+					from ! {im_done};
+				plant ->
+					io:format("Duuuude, weeeed.....!!!"),
+					NewAction = {none, empty},
+					NewState = State#life{plant= #empty{}},
+					broadcast(Nbr,empty,Coor),
+					from ! {im_done};
+				_ ->
+					io:format("Eaten?!?! Aint nobody got time for dat!"),
+					NewState = State,
+					NewAction = Action
+					from ! {not_eaten};
+		_ ->
+			io:format("Eaten?!?! Aint nobody got time for dat!"),
+			NewState = State,
+			NewAction = Action
+			from ! {not_eaten};
+	end,
+	{noreply, [Coor,Nbr,NewState,NewAction]}
+
 handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
+	{X,Y} = Coor,
 	case element(1, State) of
 		empty -> 
-			NewState = #life{animal= Animal},
-			From ! {move_here, empty};
+			NewState = #life{animal=Animal, plant=#empty{}},
+			frame ! {change_cell,X,Y,element(1, Animal)},
+			From ! {move_here};
 		barrier ->
 			NewState = State,
 			From ! {dont_move};
@@ -289,16 +351,17 @@ handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
 			case element(1, State#life.animal) of
 				empty ->
 					NewState = State#life{animal= Animal},
+					frame ! {change_cell,X,Y,element(1, Animal)},
 					From ! {move_here};
 				_ -> 
 				io:format("Här kraschade vi förrut ~n"),
 				NewState = State,
 				From ! {dont_move}
-			end
+			end;
 		_ ->
 			NewState = State
 	end,
-	{noreply, [Coor, Nbr, NewState, Action]}
+	{noreply, [Coor, Nbr, NewState, Action]};
 
 handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 	{noreply, [Coordinates,Nbr,State|_T]}.
@@ -306,24 +369,37 @@ handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 
 handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 	case Info of
+		{new_type,Type,From} ->
+			NewNbr = lists:keyreplace(From, Type, Nbr, {From, Type}),
+		{not_eaten} ->
+			NewState = State,
+			NewNbr = Nbr,
+			NewAction = {none, empty}; 
+		{im_done} ->
+			NewState = State,
+			NewNbr = Nbr,
+			NewAction = {none, empty}; 
 		{move_here} ->
 			io:format("Mooverooo!!!~n"),
+			{X,Y} = Coordinates,
 			case element(1, State#life.plant) of
-				{X,Y} = Coordinates,
 				plant -> 
-					NewState = State#life(animal= #empty{}),
+					NewState = State#life{animal=#empty{}},
 					frame ! {change_cell, X, Y, "plant"};
 				_ -> 
-					NewState = #empty{};
+					NewState = #empty{},
 					frame ! {change_cell, X, Y, "empty"} 
 			end,
+			NewNbr = Nbr,
 			NewAction = {none, empty};
 		{dont_move} -> 
 			NewState = State,
+			NewNbr = Nbr,
 			NewAction = {none, empty};
 		{move, To} ->
 			io:format("Jag ska till: ~p~n", [To]),
 			NewState = State,
+			NewNbr = Nbr,
 			NewAction = {goto, getAdjecentAt(Coordinates, Nbr, To)};
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
@@ -380,9 +456,10 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 			io:format("~p: Undefined message: ~p~n",[Coordinates, Info]),
 			gen_server:cast(self(), tock),
 			NewAction = {none, empty},
+			NewNbr = Nbr,
 			NewState = State
 	end,
-	{noreply, [Coordinates,Nbr,NewState,NewAction]}.
+	{noreply, [Coordinates,NewNbr,NewState,NewAction]}.
 
 terminate(_Reason, State) ->
 	{X,Y} = hd(State),
@@ -400,7 +477,7 @@ sur_nodes({X,Y}, Max_X, Max_Y) ->
 	L = [{Xn, Yn} || 
 			Yn <- [Y-1, Y, Y+1], Xn <- [X-1, X, X+1], 
 			Xn >= 0, Xn < Max_X, Yn >=0, Yn < Max_Y, {Xn, Yn} =/= {X,Y}],
-	lists:map(fun({C,R}) -> list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)) end ,L).
+	lists:map(fun({C,R}) -> {list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)), empty} end ,L).
 
 find_aval([],Ack,P) ->
 	case Ack of
@@ -433,32 +510,32 @@ is_food(Nbr, Food) ->
 test() -> 
 	driver ! {step}.
 
-getAdjecentAt ({X,Y}, Nbr,Direction) ->
+getAdjecentAt ({_X,_Y}, Nbr,Direction) ->
 	case Direction of
 		n  -> %% North
-			%%Next = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y-1));
-			Next = lists:nth(2, Nbr);
+			%%{Next,_} = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y-1));
+			{Next,_ } = lists:nth(2, Nbr);
 		ne -> %% Northeast
-			%%Next = ["x", X+1, y, Y-1];
-			Next = lists:nth(3, Nbr);
+			%%{Next,_} = ["x", X+1, y, Y-1];
+			{Next,_} = lists:nth(3, Nbr);
 		e  -> %% East
-			%%Next = ["x", X+1, y, Y];
-			Next = lists:nth(5, Nbr);
+			%%{Next,_} = ["x", X+1, y, Y];
+			{Next,_} = lists:nth(5, Nbr);
 		se -> %% Southeast
-			%%Next = ["x", X+1, y, Y+1];
-			Next = lists:nth(8, Nbr);
+			%%{Next,_} = ["x", X+1, y, Y+1];
+			{Next,_} = lists:nth(8, Nbr);
 		s  -> %% South
-			%%Next = ["x", X, y, Y+1];
-			Next = lists:nth(7, Nbr);
+			%%{Next,_} = ["x", X, y, Y+1];
+			{Next,_} = lists:nth(7, Nbr);
 		sw -> %% Southwest
-			%%Next = ["x", X-1, y, Y+1];
-			Next = lists:nth(6, Nbr);
+			%%{Next,_} = ["x", X-1, y, Y+1];
+			{Next,_} = lists:nth(6, Nbr);
 		w  -> %% West
-			%%Next = ["x", X-1, y, Y];
-			Next = lists:nth(4, Nbr);
+			%%{Next,_} = ["x", X-1, y, Y];
+			{Next,_} = lists:nth(4, Nbr);
 		_ -> %% Northwest
-			%%Next = ["x", X-1, y, Y-1];
-			Next = lists:nth(1, Nbr)
+			%%{Next,_} = ["x", X-1, y, Y-1];
+			{Next,_} = lists:nth(1, Nbr)
 	end,
 	Next.
 
@@ -478,16 +555,16 @@ lookAround (State,Nbr) ->
 														{n, -(VisionRange*VisionRange)},
 														{s, VisionRange*VisionRange},
 														self()]),
-	(lists:nth(1, Nbr)) ! {vision, AnimalType, nw, VisionRange, [], DataCollector},
-	(lists:nth(2, Nbr)) ! {vision, AnimalType, n, VisionRange, [], DataCollector},
-	(lists:nth(3, Nbr)) ! {vision, AnimalType, ne, VisionRange, [], DataCollector},
-	(lists:nth(4, Nbr)) ! {vision, AnimalType, w, VisionRange, [], DataCollector},
-	(lists:nth(5, Nbr)) ! {vision, AnimalType, e, VisionRange, [], DataCollector},
-	(lists:nth(6, Nbr)) ! {vision, AnimalType, sw, VisionRange, [], DataCollector},
-	(lists:nth(7, Nbr)) ! {vision, AnimalType, s, VisionRange, [], DataCollector},
-	(lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
+	element(1, lists:nth(1, Nbr)) ! {vision, AnimalType, nw, VisionRange, [], DataCollector},
+	element(1, lists:nth(2, Nbr)) ! {vision, AnimalType, n, VisionRange, [], DataCollector},
+	element(1, lists:nth(3, Nbr)) ! {vision, AnimalType, ne, VisionRange, [], DataCollector},
+	element(1, lists:nth(4, Nbr)) ! {vision, AnimalType, w, VisionRange, [], DataCollector},
+	element(1, lists:nth(5, Nbr)) ! {vision, AnimalType, e, VisionRange, [], DataCollector},
+	element(1, lists:nth(6, Nbr)) ! {vision, AnimalType, sw, VisionRange, [], DataCollector},
+	element(1, lists:nth(7, Nbr)) ! {vision, AnimalType, s, VisionRange, [], DataCollector},
+	element(1, lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
 
-visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+visionDataCollector (8, _AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
 	case (WorstVal >= BestVal) of
 		true ->
 			case WorstDir of
@@ -513,7 +590,7 @@ visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To
 	end;
 visionDataCollector (N, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
 	receive
-		{vision_re, Source, Direction, Objects} ->
+		{vision_re, _Source, Direction, Objects} ->
 			case AnimalType of
 				herbivore ->
 					Value = herbivoreProspect(Objects, 0);
@@ -556,7 +633,34 @@ carnivoreProspect ([{Object, Range} | Rest], Acc) ->
 			carnivoreProspect(Rest, Acc)
 	end.
 
-boradcast(Nbr, Message, From) ->
+
+boradcast(Nbr,Type,From) ->
 	{C,R} = From,
 	Name = list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)),
-	lists:map(fun(X) -> X ! {Message, From} end, Nbr).
+	lists:map(fun({X,_}) -> X ! {new_type, Type, From} end, Nbr).
+
+generateGenetics(ParentVision, ParentStarvation) ->
+	{MinVision, MaxVision} = variables:visionRange(),
+	{MinStarvation, MaxStarvation} = variables:starvationRange(),
+
+	random:seed(now()),
+	TempVision = ParentVision + (random:uniform(3) - 2),
+	TempStarvation = ParentStarvation + (random:uniform(3) - 2),
+	if
+		TempVision < MinVision ->
+			Vision = MinVision;
+		TempVision > MaxVision ->
+			Vision = MaxVision;
+		true ->
+			Vision = TempVision
+	end,
+	if
+		TempStarvation < MinStarvation ->
+			Starvation = MinStarvation;
+		TempStarvation > MaxStarvation ->
+			Starvation = MaxStarvation;
+		true ->
+			Starvation = TempStarvation
+	end,
+	{Vision, Starvation}.
+
