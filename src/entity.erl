@@ -27,10 +27,10 @@ init([Coordinates, C, R, T]) ->
 			Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
 		2 ->
 			Class = "herbivore",
-			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_', vision=3}};
+			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_', vision=7}};
 		3 ->
 			Class = "carnivore",
-			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_', vision=5}};
+			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_', vision=12}};
 		-1 ->
 			Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ ->
@@ -46,11 +46,14 @@ handle_call({move_herbivore, Animal}, _From, [Coordinates, Nbr, State, T]) ->
 		life ->
 			Reply = State#life.animal,
 			NewState = State#life{animal = Animal};
+		barrier ->
+			Reply = State#barrier{},
+			NewState = State;
 		_ ->
 			Reply = State#empty{},
 			NewState = #life{animal=Animal, plant=#empty{}}
 	end,
-	frame ! {change_cell, X, Y, "herbivore"},
+	frame ! {change_cell, X, Y, element(1, Animal)},
 	{reply, Reply, [Coordinates, Nbr,NewState, T]};
 
 handle_call(is_notAnimal, _From, [Coordinates,Nbr,State|T]) ->
@@ -165,15 +168,20 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 								{goto, Target} ->
 									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
 									NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
-									case element(1, State#life.plant) of
-										plant ->
-											NewState = State#life{animal= NewAnimal},
-											New = "plant";
-										_ -> 
-											NewState = #empty{},
-											New = "empty"
-									end,
-									frame ! {change_cell, X, Y, New};
+									case element(1, NewAnimal) of
+										barrier ->
+											NewState = State;
+										_->
+											case element(1, State#life.plant) of
+												plant ->
+													NewState = State#life{animal= NewAnimal},
+													New = "plant";
+												_ -> 
+													NewState = #empty{},
+													New = "empty"
+											end,
+											frame ! {change_cell, X, Y, New}
+									end;									
 								{none, _} ->
 									NewState = State
 							end
@@ -278,7 +286,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 		{move, To} ->
 			io:format("Jag ska till: ~p~n", [To]),
 			NewState = State,
-			NewAction = {goto, To};
+			NewAction = {goto, getAdjecentAt(Coordinates, Nbr, To)};
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
 			NewAction = {none, empty},
@@ -439,7 +447,6 @@ lookAround (State,Nbr) ->
 	(lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
 
 visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
-	io:format("visionDataCollector basecase"),
 	case (WorstVal >= BestVal) of
 		true ->
 			case WorstDir of
@@ -476,13 +483,13 @@ visionDataCollector (N, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To
 			end,
 			case (Value > BestVal) of
 				true -> 
-					visionDataCollector (N-1, AnimalType, {Direction, Value}, {WorstDir, WorstVal}, To);
+					visionDataCollector (N+1, AnimalType, {Direction, Value}, {WorstDir, WorstVal}, To);
 				false ->
 					case (Value < WorstVal) of
 						true ->
-							visionDataCollector (N-1, AnimalType, {BestDir, BestVal}, {Direction, Value}, To);
+							visionDataCollector (N+1, AnimalType, {BestDir, BestVal}, {Direction, Value}, To);
 						false ->
-							visionDataCollector (N-1, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To)
+							visionDataCollector (N+1, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To)
 					end
 			end
 	end.
