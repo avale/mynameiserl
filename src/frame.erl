@@ -214,7 +214,7 @@ draw_item(X, Y, Data) ->
     case gb_trees:lookup({X, Y}, Data) of
         none ->
             {td, ["?"]};
-        {value, Color} ->
-            {td, [{class, Color}]}
+        {value, Class} ->
+            {td, [{class, Class}]}
     end.
                 

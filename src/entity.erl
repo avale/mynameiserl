@@ -22,9 +22,9 @@ init([Coordinates, C, R, T]) ->
 	Nbr = sur_nodes(Coordinates,C,R),
 	{X,Y} = Coordinates,
 	case T of
-		1 -> Class = "plant", Type = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
-		2 -> Class = "herbivore", Type = #life{plant=#empty{}, animal=#herbivore{class = Class, _ = '_'}};
-		3 -> Class = "carnivore", Type = #life{plant=#empty{}, animal=#carnivore{class = Class, _ = '_'}};
+		1 -> Class = "plant", Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
+		2 -> Class = "herbivore", Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_'}};
+		3 -> Class = "carnivore", Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_'}};
 		-1 -> Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ -> Class = "empty", Type = #empty{class = Class, _ = '_'}
 	end,
@@ -101,10 +101,12 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 							NewAction = {goto, Victim},
 							io:format("[~p|PLING]: JAG VILL TILL ~p~n",[Coordinates,Victim])
 					end,
-					NewAnimal = Animal#herbivore{},
+					Hunger = Animal#herbivore.hunger,
+					NewAnimal = Animal#herbivore{hunger=Hunger+1},
 					ok;
 				carnivore ->
-					NewAnimal = Animal#carnivore{},
+					Hunger = Animal#carnivore.hunger,
+					NewAnimal = Animal#carnivore{hunger=Hunger+1},
 					NewAction = Action,
 					ok;
 				_ ->
@@ -148,21 +150,36 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-					case Action of
-						{goto, Target} ->
-							io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
-							NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
+					Hunger = Animal#herbivore.hunger,
+					Starvation = Animal#herbivore.starvation,
+					case Hunger > Starvation of
+						true ->
 							case element(1, State#life.plant) of
 								plant ->
-									NewState = State#life{animal= NewAnimal},
+									NewState = State#life{animal=#empty{}},
 									New = "plant";
 								_ -> 
 									NewState = #empty{},
 									New = "empty"
 							end,
 							frame ! {change_cell, X, Y, New};
-						{none, _} ->
-							NewState = State
+						_ ->
+							case Action of
+								{goto, Target} ->
+									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
+									NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
+									case element(1, State#life.plant) of
+										plant ->
+											NewState = State#life{animal= NewAnimal},
+											New = "plant";
+										_ -> 
+											NewState = #empty{},
+											New = "empty"
+									end,
+									frame ! {change_cell, X, Y, New};
+								{none, _} ->
+									NewState = State
+							end
 					end,
 					ok;
 				carnivore ->
