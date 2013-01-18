@@ -90,11 +90,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-<<<<<<< HEAD
 					Aval = find_aval(Nbr),
-=======
-					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal, 500) end, Nbr), Bool =/= false],
->>>>>>> bb8fbb2c045f950b535316072adbb7ab0b5976c4
 					case Aval of
 						[] ->
 							NewAction = Action,
@@ -186,9 +182,12 @@ handle_cast(spawn_plant, [{X,Y},Nbr,State|T]) ->
 			Class = "plant", 
 			NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
 			frame ! {change_cell,X,Y,Class};
-		_ ->
+		barrier ->
 			NewState = State,
-			ok
+			ok;
+		_ -> 
+			Class = element(1, State#life.animal),
+			NewState = State#life{plant=#plant{class = "plant", age = 0, growth = 4, _ = '_'}}
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
