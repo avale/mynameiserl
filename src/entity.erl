@@ -90,12 +90,13 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-					spawn(?MODULE, find_aval, [Nbr,[], self()]),
+					lookAround(State),
 					Hunger = Animal#herbivore.hunger,
 					NewAnimal = Animal#herbivore{hunger=Hunger+1},
 					NewAction = Action,
 					ok;
 				carnivore ->
+					lookAround(State),
 					Hunger = Animal#carnivore.hunger,
 					NewAnimal = Animal#carnivore{hunger=Hunger+1},
 					NewAction = Action,
@@ -190,8 +191,22 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 							io:format("[~p, ~p] Meeeh~n",[X, Y]),
 							frame ! {change_cell, X, Y, New};
 						_ ->
-							NewState = State,
-							ok
+							case Action of
+								{goto, Target} ->
+									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
+									NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
+									case element(1, State#life.plant) of
+										plant ->
+											NewState = State#life{animal= NewAnimal},
+											New = "plant";
+										_ -> 
+											NewState = #empty{},
+											New = "empty"
+									end,
+									frame ! {change_cell, X, Y, New};
+								{none, _} ->
+									NewState = State
+							end
 					end,
 					ok;
 				_ ->
@@ -254,7 +269,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 					NewAction = {none, empty};
 				_ ->
 					NewState = State,
-					NewAction = {goto, To}
+					NewAction = {goto, getAdjecentAt(To)}
 			end;
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
@@ -383,3 +398,97 @@ getAdjecentAt ({X,Y}, Direction) ->
 			Next = [x, X, y, Y]
 	end,
 	list_to_atom(Next).
+
+
+lookAround (State) ->
+	Animal = State#life.animal,
+	AnimalType = element(1, Animal),
+	case AnimalType of
+		herbivore ->
+			VisionRange = Animal#herbivore.vision;
+		carnivore ->
+			VisionRange = Animal#carnivore.vision;
+		_ ->
+			VisionRange = 0
+	end,
+	DataCollector = spawn(?MODULE, visionDataCollector, [0, AnimalType,
+														{n, -(VisionRange*VisionRange)},
+														{s, VisionRange*VisionRange},
+														self()]),
+	(lists:nth(1, Nbr)) ! {vision, AnimalType, nw, VisionRange, [], DataCollector},
+	(lists:nth(2, Nbr)) ! {vision, AnimalType, n, VisionRange, [], DataCollector},
+	(lists:nth(3, Nbr)) ! {vision, AnimalType, ne, VisionRange, [], DataCollector},
+	(lists:nth(4, Nbr)) ! {vision, AnimalType, w, VisionRange, [], DataCollector},
+	(lists:nth(5, Nbr)) ! {vision, AnimalType, e, VisionRange, [], DataCollector},
+	(lists:nth(6, Nbr)) ! {vision, AnimalType, sw, VisionRange, [], DataCollector},
+	(lists:nth(7, Nbr)) ! {vision, AnimalType, s, VisionRange, [], DataCollector},
+	(lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
+
+visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+	case (WorstVal >= BestVal) of
+		true ->
+			case WorstDir of
+				n ->
+					To ! {move, s};
+				ne ->
+					To ! {move, sw};
+				e ->
+					To ! {move, w};
+				se ->
+					To ! {move, nw};
+				s ->
+					To ! {move, n};
+				sw ->
+					To ! {move, ne};
+				w ->
+					To ! {move, e};
+				_ ->
+					To ! {move, se}
+			end;
+		false ->
+			To ! {move, BestDir}
+	end;
+visionDataCollector (n, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+	receive
+		{vision_re, Source, Direction, Objects} ->
+			case AnimalType of
+				herbivore ->
+					Value = herbivoreProspect(Objects, 0);
+				carnivore ->
+					Value = carnivoreProspect(Objects, 0);
+				_ ->
+					Value = 0
+			end,
+			case (Value > BestVal) of
+				true -> 
+					visionDataCollector (n-1, AnimalType, {Direction, Value}, {WorstDir, WorstVal}, To);
+				false ->
+					case (Value < WorstVal) of
+						true ->
+							visionDataCollector (n-1, AnimalType, {BestDir, BestVal}, {Direction, Value}, To);
+						false ->
+							visionDataCollector (n-1, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To)
+					end
+			end
+	end.
+
+herbivoreProspect ([], Acc) -> Acc;
+herbivoreProspect ([{Object, Range} | Rest], Acc) ->
+	case Object of
+		carnivore ->
+			herbivoreProspect(Rest, (Range*(-1))+Acc);
+		plant ->
+			herbivoreProspect(Rest, (Range+Acc));
+		_ ->
+			herbivoreProspect(Rest, Acc)
+	end.
+
+
+carnivoreProspect ([], Acc) -> Acc;
+carnivoreProspect ([{Object, Range} | Rest], Acc) ->
+	case Object of
+		herbivore ->
+			carnivoreProspect(Rest, (Range+Acc));
+		_ ->
+			carnivoreProspect(Rest, Acc)
+	end.
