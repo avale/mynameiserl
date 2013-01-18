@@ -278,7 +278,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 		{move, To} ->
 			io:format("Jag ska till: ~p~n", [To]),
 			NewState = State,
-			NewAction = {goto, getAdjecentAt(Coordinates,Nbr,To)}
+			NewAction = {goto, To},
 			end;
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
