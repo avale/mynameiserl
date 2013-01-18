@@ -90,7 +90,11 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
+<<<<<<< HEAD
 					Aval = find_aval(Nbr),
+=======
+					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal, 500) end, Nbr), Bool =/= false],
+>>>>>>> bb8fbb2c045f950b535316072adbb7ab0b5976c4
 					case Aval of
 						[] ->
 							NewAction = Action,
@@ -194,91 +198,6 @@ handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 
 handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 	case Info of
-		{tick} ->
-			{X,Y} = Coordinates,
-			Type = element(1, State),
-			case Type of
-				empty ->
-					NewState = State,
-					ok;
-				barrier ->
-					NewState = State,
-					ok;
-				life ->
-					Plant = State#life.plant,
-					PlantType = element(1, Plant),
-					Animal = State#life.animal,
-					AnimalType = element(1, Animal),
-					case PlantType of
-						plant ->
-							OldAge = Plant#plant.age,
-							NewPlant = Plant#plant{age=OldAge+1},
-							Age = Plant#plant.age,
-							io:format("Age: ~p~n",[Age]);
-						_ ->
-							NewPlant = Plant#empty{},
-							ok
-					end,
-					case AnimalType of
-						herbivore ->
-							NewAnimal = Animal#herbivore{},
-							ok;
-						carnivore ->
-							NewAnimal = Animal#carnivore{},
-							ok;
-						_ ->
-							NewAnimal = Animal#empty{},
-							ok
-					end,
-					NewState = State#life{plant=NewPlant, animal=NewAnimal}
-			end,
-			ok;
-		{tock} ->
-			{X,Y} = Coordinates,
-			Type = element(1, State),
-			case Type of
-				empty ->
-					NewState = State,
-					ok;
-				barrier ->
-					NewState = State,
-					ok;
-				life ->
-					Plant = State#life.plant,
-					PlantType = element(1, Plant),
-					Animal = State#life.animal,
-					AnimalType = element(1, Animal),
-					case PlantType of
-						plant ->
-							Age = Plant#plant.age,
-							Growth = Plant#plant.growth,
-							NewState = State,
-							case (Age rem Growth) of
-								0 ->
-									random:seed(now()),
-									Victim = lists:nth(random:uniform(8), Nbr),
-									Victim ! {spawn_plant, self()},
-									frame ! {change_cell, X, Y, "plant"};
-								_ ->
-									ok
-							end;
-						_ ->
-							NewState = State,
-							ok
-					end
-					%case Animal of
-					%	herbivore ->
-					%		NewState = State,
-					%		ok;
-					%	carnivore ->
-					%		NewState = State,
-					%		ok;
-					%	_ ->
-					%		NewState = State,
-					%		ok
-					%end
-			end,
-			ok;
 		{spawn_plant, From} ->
 			case element(1, State) of
 				empty ->
