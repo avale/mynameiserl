@@ -257,12 +257,21 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 					NewAction = {goto, To}
 			end;
 		{vision, Source, Direction, Range, Objects, Origin} ->
-			Next = getAdjecentAt(Coordinates, C, R, Direction),
+			NewState = State,
+			NewAction = {none, empty},
 			case Range>0 of
+				false ->
+					Origin ! {vision_re, Source, Direction, Objects};
 				true ->
 					Type = element(1, State),
 					case Type of
+						barrier ->
+							Origin ! {vision_re, Source, Direction, Objects};
+						empty ->
+							Next = getAdjecentAt(Coordinates, Direction),
+							Next ! {vision, Source, Direction, Range-1, Objects, Origin};
 						life ->
+							Next = getAdjecentAt(Coordinates, Direction),
 							Plant = State#life.plant,
 							PlantType = element(1, Plant),
 							Animal = State#life.animal,
@@ -295,14 +304,8 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 											Next ! {vision, Source, Direction, Range-1,
 											Objects, Origin}
 									end
-							end;
-						empty ->
-							Next ! {vision, Source, Direction, Range-1, Objects, Origin};
-						barrier ->
-							Origin ! {vision_re, Source, Direction, Objects}
-					end;
-				false ->
-					Origin ! {vision_re, Source, Direction, Objects}
+							end
+					end
 			end;
 		_ -> 
 			io:format("~p: Undefined message: ~p~n",[Coordinates, Info]),
@@ -358,48 +361,25 @@ find_aval([H|T],Ack, P) ->
 test() -> 
 	driver ! {step}.
 
-getAdjecentAt ({X,Y}, Max_X, Max_Y, Direction) ->
+getAdjecentAt ({X,Y}, Direction) ->
 	case Direction of
 		n  -> %% North
-			case (0<Y) of
-				true  -> Next = [x, X, y, Y-1];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X, y, Y-1];
 		ne -> %% Northeast
-			case (X<Max_X) and (0<Y) of
-				true  -> Next = [x, X+1, y, Y-1];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X+1, y, Y-1];
 		e  -> %% East
-			case (X<Max_X) of
-				true  -> Next = [x, X+1, y, Y];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X+1, y, Y];
 		se -> %% Southeast
-			case (X<Max_X) and (Y<Max_Y) of
-				true  -> Next = [x, X+1, y, Y+1];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X+1, y, Y+1];
 		s  -> %% South
-			case (Y<Max_Y) of
-				true  -> Next = [x, X, y, Y+1];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X, y, Y+1];
 		sw -> %% Southwest
-			case (0<X) and (Y<Max_Y) of
-				true  -> Next = [x, X-1, y, Y+1];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X-1, y, Y+1];
 		w  -> %% West
-			case (0<X) of
-				true  -> Next = [x, X-1, y, Y];
-				false -> [x, X, y, Y]
-			end;
+			Next = [x, X-1, y, Y];
 		nw -> %% Northwest
-			case (0<X) and (0<Y) of
-				true  -> Next = [x, X-1, y, Y-1];
-				false -> [x, X, y, Y]
-			end;
-		_ -> Next = [x, X, y, Y]
+			Next = [x, X-1, y, Y-1];
+		_ ->  %% ???
+			Next = [x, X, y, Y]
 	end,
 	list_to_atom(Next).
