@@ -6,7 +6,7 @@ plantGrowth() -> 4.
 herbivoreVision() -> 3.
 carnivoreVision() -> 12.
 
-herbivoreStarvation() -> 20.
+herbivoreStarvation() -> 30.
 carnivoreStarvation() -> 20.
 
 visionRange() -> {2, 20}.

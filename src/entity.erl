@@ -214,7 +214,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 
 handle_cast({spawn_plant, ParentGrowth}, [{X,Y},Nbr,State|T]) ->
 	random:seed(now()),
-	NewGrowth = ParentGrowth + (random:uniform(3) - 2), %% GENETICZ
+	NewGrowth = ParentGrowth + (random:uniform(3) - 2),
 	case NewGrowth < 2 of
 		true ->
 			Growth = 2;
