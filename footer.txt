@@ -1,0 +1,24 @@
+----- PASTURE SIMULATOR -----
+
+Size:			27x27
+Speed:			1 glan / sec
+Glans:			82
+
+Fox count:		2
+Bunny count:	6
+Grass count:	19
+
+------------ LOG ------------
+
+Bunny ate grass.
+Fox ate bunny.
+Bunny ate grass.
+Bunny moved north.
+Bunny ate grass.
+Bunny moved east.
+Fox died of starvation.
+Fox moved west.
+
+Grass continues to spread.
+
+-----------------------------

@@ -106,23 +106,98 @@ getAdjecentAt ({X,Y}, Max_X, Max_Y, Direction) ->
 	list_to_atom(Next).
 
 lookAround () ->
-	(lists:nth(1, Nbr)
-
-
-
-	Neighbours =
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, n), n} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, ne), ne} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, e), e} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, se), se} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, s), s} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, sw), sw} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, w), w} ++
-		{getAdjecentAt(Coordinates, Max_X, Max_Y, nw), nw},
-	lists:foreach(fun({PID, Direction}) -> N ! (vision, Source, Direction, Range, [], self()), Neighbours),
-	Collector = spawn(?MODULE, visionDataCollector, []).
-
-visionDataCollector (N, NE, E, SE, S, SW, W, NW) -> ok.
+	Animal = State#life.animal,
+	AnimalType = element(1, Animal),
+	case AnimalType of
+		herbivore ->
+			VisionRange = Animal#herbivore.vision;
+		carnivore ->
+			VisionRange = Animal#carnivore.vision;
+		_ ->
+			VisionRange = 0
+	end,
+	DataCollector = spawn(?MODULE, visionDataCollector, [0, AnimalType,
+														{n, -(VisionRange*VisionRange)},
+														{s, VisionRange*VisionRange},
+														self()]),
+	(lists:nth(1, Nbr)) ! {vision, AnimalType, nw, VisionRange, [], DataCollector},
+	(lists:nth(2, Nbr)) ! {vision, AnimalType, n, VisionRange, [], DataCollector},
+	(lists:nth(3, Nbr)) ! {vision, AnimalType, ne, VisionRange, [], DataCollector},
+	(lists:nth(4, Nbr)) ! {vision, AnimalType, w, VisionRange, [], DataCollector},
+	(lists:nth(5, Nbr)) ! {vision, AnimalType, e, VisionRange, [], DataCollector},
+	(lists:nth(6, Nbr)) ! {vision, AnimalType, sw, VisionRange, [], DataCollector},
+	(lists:nth(7, Nbr)) ! {vision, AnimalType, s, VisionRange, [], DataCollector},
+	(lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector},
 	receive
-		{vision_re, Source, n, Objects} -> ok;
-		{vision_re, Source, ne, Objects} -> ok;
+		{choose_dir, Dir} -> ok %% FLYTTA FANSKAPET HITÅT
+	end.
+
+visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+	case (WorstVal >= BestVal) of
+		true ->
+			case WorstDir of
+				n ->
+					To ! {choose_dir, s};
+				ne ->
+					To ! {choose_dir, sw};
+				e ->
+					To ! {choose_dir, w};
+				se ->
+					To ! {choose_dir, nw};
+				s ->
+					To ! {choose_dir, n};
+				sw ->
+					To ! {choose_dir, ne};
+				w ->
+					To ! {choose_dir, e};
+				_ ->
+					To ! {choose_dir, se}
+			end;
+		false ->
+			To ! {choose_dir, BestDir}
+	end;
+visionDataCollector (n, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+	receive
+		{vision_re, Source, Direction, Objects} ->
+			case AnimalType of
+				herbivore ->
+					Value = herbivoreProspect(Objects, 0);
+				carnivore ->
+					Value = carnivoreProspect(Objects, 0);
+				_ ->
+					Value = 0
+			end,
+			case (Value > BestVal) of
+				true -> 
+					visionDataCollector (n-1, AnimalType, {Direction, Value}, {WorstDir, WorstVal}, To);
+				false ->
+					case (Value < WorstVal) of
+						true ->
+							visionDataCollector (n-1, AnimalType, {BestDir, BestVal}, {Direction, Value}, To);
+						false ->
+							visionDataCollector (n-1, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To)
+					end
+			end
+	end.
+
+herbivoreProspect ([], Acc) -> Acc;
+herbivoreProspect ([{Object, Range} | Rest], Acc) ->
+	case Object of
+		carnivore ->
+			herbivoreProspect(Rest, (Range*(-1))+Acc);
+		plant ->
+			herbivoreProspect(Rest, (Range+Acc));
+		_ ->
+			herbivoreProspect(Rest, Acc)
+	end.
+
+
+carnivoreProspect ([], Acc) -> Acc;
+carnivoreProspect ([{Object, Range} | Rest], Acc) ->
+	case Object of
+		herbivore ->
+			carnivoreProspect(Rest, (Range+Acc));
+		_ ->
+			carnivoreProspect(Rest, Acc)
+	end.
+	
