@@ -62,6 +62,7 @@ handle_call({move_herbivore, Animal}, _From, [Coordinates, Nbr, State, T]) ->
 			Reply = State#empty{},
 			NewState = #life{animal=Animal, plant=#empty{}}
 	end,
+	broadcast(Nbr,element(1, Animal),Coordinates),
 	frame ! {change_cell, X, Y, element(1, Animal)},
 	{reply, Reply, [Coordinates, Nbr,NewState, T]};
 
@@ -79,6 +80,11 @@ handle_call(is_notAnimal, _From, [Coordinates,Nbr,State|T]) ->
 
 handle_cast(stop, State) ->
 	{stop, shutdown, State};
+
+handle_cast(broadcast, [Coordinates,Nbr,State]) ->
+	Type = element(1, State),
+	io:format("BROADCAST: My type is ~p!~n",[Type]),
+	broadcast(Nbr, Type, Coordinates);
 
 handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 	Type = element(1, State),
@@ -105,18 +111,19 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			case AnimalType of
 				herbivore ->
 					case is_food(Nbr, plant) of
-						{_,Pid} -> 
+						{Pid,_} -> 
+							io:format("Yummy yummy!~n"),
 							NewAction = {eat, Pid},
 							NewAnimal = Animal;
 						_ ->
 							lookAround(State,Nbr),
 							Hunger = Animal#herbivore.hunger,
 							NewAnimal = Animal#herbivore{hunger=Hunger+1},
-							NewAction = Action,
+							NewAction = Action
 					end;
 				carnivore ->
 					case is_food(Nbr, herbivore) of
-						{_,Pid} -> 
+						{Pid,_} -> 
 							NewAction = {eat, Pid},
 							NewAnimal = Animal;
 						_ ->
@@ -127,7 +134,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 					end;
 				_ ->
 					NewAnimal = Animal#empty{},
-					NewAction = Action
+					NewAction = Action,
 					ok
 			end,
 			NewState = State#life{plant=NewPlant, animal=NewAnimal}
@@ -173,18 +180,18 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 							case element(1, State#life.plant) of
 								plant ->
 									NewState = State#life{animal=#empty{}},
+									broadcast(Nbr,plant,{X,Y}),
 									New = "plant";
 								_ -> 
 									NewState = #empty{},
+									broadcast(Nbr,empty,{X,Y}),
 									New = "empty"
 							end,
-							io:format("[~p, ~p] Aaaaaaargh~n",[X, Y]),
 							frame ! {change_cell, X, Y, New};
 						_ ->
 							case Action of
 								{goto, Target} ->
 									NewState = State,
-									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
 									gen_server:cast(Target, {move_animal, Animal, self()});									
 								{eat,Pid} ->
 									io:format("~p: OMNOMNOMNOM, Weed!", [Coordinates]),
@@ -203,18 +210,18 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 							case element(1, State#life.plant) of
 								plant ->
 									NewState = State#life{animal=#empty{}},
+									broadcast(Nbr,plant,{X,Y}),
 									New = "plant";
 								_ -> 
 									NewState = #empty{},
+									broadcast(Nbr,empty,{X,Y}),
 									New = "empty"
 							end,
-							io:format("[~p, ~p] Meeeh~n",[X, Y]),
 							frame ! {change_cell, X, Y, New};
 						_ ->
 							case Action of
 								{goto, Target} ->
 									NewState = State,
-									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
 									gen_server:cast(Target, {move_animal, Animal, self()});
 								{eat,Pid} ->
 									io:format("~p: OMNOMNOMNOM, Rabbit!", [Coordinates]),
@@ -246,6 +253,7 @@ handle_cast({spawn_plant, ParentGrowth}, [{X,Y},Nbr,State|T]) ->
 		empty ->
 			Class = "plant",
 			NewState = #life{plant=#plant{class = Class, age = 0, growth = Growth, _ = '_'}, animal=#empty{}},
+			broadcast(Nbr,plant,{X,Y}),
 			frame ! {change_cell,X,Y,Class};
 		barrier ->
 			NewState = State,
@@ -268,12 +276,14 @@ handle_cast({spawn_animal, Animal}, [{X,Y},Nbr,State|T]) ->
 					ParentStarvation = Animal#herbivore.starvation,
 					{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
 					NewState = #life{plant=#empty{}, animal=#herbivore{class="herbivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+					broadcast(Nbr,herbivore,{X,Y}),
 					frame ! {change_cell,X,Y,"herbivore"};
 				carnivore ->
 					ParentVision = Animal#carnivore.vision,
 					ParentStarvation = Animal#carnivore.starvation,
 					{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
 					NewState = #life{plant=#empty{}, animal=#carnivore{class="carnivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+					broadcast(Nbr,carnivore,{X,Y}),
 					frame ! {change_cell,X,Y,"carnivore"};
 				_ ->
 					NewState = State,
@@ -288,12 +298,14 @@ handle_cast({spawn_animal, Animal}, [{X,Y},Nbr,State|T]) ->
 							ParentStarvation = Animal#herbivore.starvation,
 							{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
 							NewState = #life{animal=#herbivore{class="herbivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+							broadcast(Nbr,herbivore,{X,Y}),
 							frame ! {change_cell,X,Y,"herbivore"};
 						carnivore ->
 							ParentVision = Animal#carnivore.vision,
 							ParentStarvation = Animal#carnivore.starvation,
 							{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
 							NewState = #life{animal=#carnivore{class="carnivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+							broadcast(Nbr,carnivore,{X,Y}),
 							frame ! {change_cell,X,Y,"carnivore"};
 						_ ->
 							NewState = State,
@@ -309,6 +321,7 @@ handle_cast({spawn_animal, Animal}, [{X,Y},Nbr,State|T]) ->
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
 handle_cast({eaten, Type, From}, [Coor,Nbr,State,Action]) ->
+	io:format("Shit's gonna get eaten, bro!~n"),
 	case element(1, State) of
 		life ->
 			case Type of
@@ -327,15 +340,16 @@ handle_cast({eaten, Type, From}, [Coor,Nbr,State,Action]) ->
 				_ ->
 					io:format("Eaten?!?! Aint nobody got time for dat!"),
 					NewState = State,
-					NewAction = Action
-					from ! {not_eaten};
+					NewAction = Action,
+					from ! {not_eaten}
+			end;
 		_ ->
 			io:format("Eaten?!?! Aint nobody got time for dat!"),
 			NewState = State,
-			NewAction = Action
-			from ! {not_eaten};
+			NewAction = Action,
+			from ! {not_eaten}
 	end,
-	{noreply, [Coor,Nbr,NewState,NewAction]}
+	{noreply, [Coor,Nbr,NewState,NewAction]};
 
 handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
 	{X,Y} = Coor,
@@ -343,6 +357,7 @@ handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
 		empty -> 
 			NewState = #life{animal=Animal, plant=#empty{}},
 			frame ! {change_cell,X,Y,element(1, Animal)},
+			broadcast(Nbr,element(1, Animal),Coor),
 			From ! {move_here};
 		barrier ->
 			NewState = State,
@@ -352,6 +367,7 @@ handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
 				empty ->
 					NewState = State#life{animal= Animal},
 					frame ! {change_cell,X,Y,element(1, Animal)},
+					broadcast(Nbr,element(1, Animal),Coor),
 					From ! {move_here};
 				_ -> 
 				io:format("Här kraschade vi förrut ~n"),
@@ -370,8 +386,12 @@ handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 	case Info of
 		{new_type,Type,From} ->
-			NewNbr = lists:keyreplace(From, Type, Nbr, {From, Type}),
+			NewNbr = lists:keyreplace(From, 1, Nbr, {From, Type}),
+			NewState = State,
+			%%io:format("I (~p) received ~p from ~p, so now my neighbours is:~p!~n",[Coordinates, Type, From, NewNbr]),
+			NewAction = {none, empty};
 		{not_eaten} ->
+			io:format("I was not eaten ^^!~n"),
 			NewState = State,
 			NewNbr = Nbr,
 			NewAction = {none, empty}; 
@@ -380,14 +400,15 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 			NewNbr = Nbr,
 			NewAction = {none, empty}; 
 		{move_here} ->
-			io:format("Mooverooo!!!~n"),
 			{X,Y} = Coordinates,
 			case element(1, State#life.plant) of
 				plant -> 
 					NewState = State#life{animal=#empty{}},
+					broadcast(Nbr,plant,Coordinates),
 					frame ! {change_cell, X, Y, "plant"};
 				_ -> 
 					NewState = #empty{},
+					broadcast(Nbr,empty,Coordinates),
 					frame ! {change_cell, X, Y, "empty"} 
 			end,
 			NewNbr = Nbr,
@@ -397,12 +418,12 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 			NewNbr = Nbr,
 			NewAction = {none, empty};
 		{move, To} ->
-			io:format("Jag ska till: ~p~n", [To]),
 			NewState = State,
 			NewNbr = Nbr,
 			NewAction = {goto, getAdjecentAt(Coordinates, Nbr, To)};
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
+			NewNbr = Nbr,
 			NewAction = {none, empty},
 			case Range>0 of
 				false ->
@@ -505,7 +526,10 @@ find_aval([H|T],Ack, P) ->
 	end.
 
 is_food(Nbr, Food) ->
-	lists:keymember(Food, 1, Nbr).
+	%%io:format("I am food of type ~p and here is list ~p~n",[Food, Nbr]),
+	Result = lists:keyfind(Food, 2, Nbr),
+	%%io:format("Result is ~p~n",[Result]),%%
+	Result.
 
 test() -> 
 	driver ! {step}.
@@ -634,10 +658,11 @@ carnivoreProspect ([{Object, Range} | Rest], Acc) ->
 	end.
 
 
-boradcast(Nbr,Type,From) ->
+broadcast(Nbr,Type,From) ->
+	%%io:format("I (~p) try to broadcast ~p to:~p!~n",[From, Type, Nbr]),
 	{C,R} = From,
 	Name = list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)),
-	lists:map(fun({X,_}) -> X ! {new_type, Type, From} end, Nbr).
+	lists:map(fun({X,_}) -> X ! {new_type, Type, Name} end, Nbr).
 
 generateGenetics(ParentVision, ParentStarvation) ->
 	{MinVision, MaxVision} = variables:visionRange(),

@@ -49,7 +49,9 @@ loop(P, E, W, H) ->
                         {ok, Binary} = file:read_file(File),
                         Entities = parse_binary(Binary,Wn),
                         spawn_game(Entities, Wn, Hn),
-                        driver:loop(to_pid(Entities), Entities, Wn, Hn);
+                        Pids = to_pid(Entities),
+                        lists:map(fun(X) -> gen_server:cast(X, broadcast) end, Pids),
+                        driver:loop(Pids, Entities, Wn, Hn);
                 {restart} ->
                         spawn_game(E, W, H),
                         register(clock, spawn(?MODULE, tick, [P])),
