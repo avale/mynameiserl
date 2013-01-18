@@ -27,10 +27,10 @@ init([Coordinates, C, R, T]) ->
 			Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
 		2 ->
 			Class = "herbivore",
-			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_', vision=7}};
+			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=40, _ = '_', vision=7}};
 		3 ->
 			Class = "carnivore",
-			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_', vision=12}};
+			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=40, _ = '_', vision=12}};
 		-1 ->
 			Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ ->
@@ -83,11 +83,9 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 	case Type of
 		empty ->
 			NewState = State,
-			NewAction = Action,
 			ok;
 		barrier ->
 			NewState = State,
-			NewAction = Action,
 			ok;
 		life ->
 			Plant = State#life.plant,
@@ -97,7 +95,8 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			case PlantType of
 				plant ->
 					OldAge = Plant#plant.age,
-					NewPlant = Plant#plant{age=OldAge+1};
+					NewPlant = Plant#plant{age=OldAge+1},
+					io:format("I am weed. I am ~p steps old.~n",[OldAge+1]);
 				_ ->
 					NewPlant = Plant#empty{},
 					ok
@@ -107,22 +106,19 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 					lookAround(State,Nbr),
 					Hunger = Animal#herbivore.hunger,
 					NewAnimal = Animal#herbivore{hunger=Hunger+1},
-					NewAction = Action,
 					ok;
 				carnivore ->
 					lookAround(State,Nbr),
 					Hunger = Animal#carnivore.hunger,
 					NewAnimal = Animal#carnivore{hunger=Hunger+1},
-					NewAction = Action,
 					ok;
 				_ ->
 					NewAnimal = Animal#empty{},
-					NewAction = Action,
 					ok
 			end,
 			NewState = State#life{plant=NewPlant, animal=NewAnimal}
 	end,
-	{noreply, [Coordinates, Nbr, NewState, NewAction]};
+	{noreply, [Coordinates, Nbr, NewState,Action]};
 
 handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 	{X,Y} = Coordinates,
@@ -174,7 +170,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 							case Action of
 								{goto, Target} ->
 									io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
-									NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
+									NewAnimal = gen_server:cast(Target, {move_animal, Animal, self()}),
 									case element(1, NewAnimal) of
 										barrier ->
 											NewState = State;
