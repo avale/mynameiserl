@@ -199,8 +199,9 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 											frame ! {change_cell, X, Y, New}
 									end;
 								{eat,Pid} ->
-									io:format("~p: OMNOMNOMNOM!", [Coordinates]),
-																		
+									io:format("~p: OMNOMNOMNOM, Weed!", [Coordinates]),
+									gen_server:cast(Pid, {eaten, plant, self()}),
+									NewState = State,
 								{none, _} ->
 									NewState = State
 							end
@@ -235,6 +236,10 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 											New = "empty"
 									end,
 									frame ! {change_cell, X, Y, New};
+								{eat,Pid} ->
+									io:format("~p: OMNOMNOMNOM, Rabbit!", [Coordinates]),
+									gen_server:cast(Pid, {eaten, animal, self()}),
+									NewState = State,
 								{none, _} ->
 									NewState = State
 							end
