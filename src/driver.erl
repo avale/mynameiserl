@@ -72,7 +72,7 @@ loop(P, E, W, H) ->
                         driver:loop(P,E,W,H);
                 {step} ->
                         lists:map((fun (X) -> gen_server:cast(X, tick) end), P),
-                        timer:sleep(5000),
+                        timer:sleep(1000),
                         lists:map((fun (X) -> gen_server:cast(X, tock) end), P);
                 _ ->
                         io:format("Driver: Undefined message~n",[])
