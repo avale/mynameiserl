@@ -22,18 +22,22 @@ init([Coordinates, C, R, T]) ->
 	Nbr = sur_nodes(Coordinates,C,R),
 	{X,Y} = Coordinates,
 	case T of
-		1 -> Class = "plant", Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
-		2 -> Class = "herbivore", Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_'}};
-		3 -> Class = "carnivore", Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_'}};
-		-1 -> Class = "barrier", Type = #barrier{class = Class, _ = '_'};
-		_ -> Class = "empty", Type = #empty{class = Class, _ = '_'}
+		1 ->
+			Class = "plant",
+			Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
+		2 ->
+			Class = "herbivore",
+			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_'}};
+		3 ->
+			Class = "carnivore",
+			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_'}};
+		-1 ->
+			Class = "barrier", Type = #barrier{class = Class, _ = '_'};
+		_ ->
+			Class = "empty", Type = #empty{class = Class, _ = '_'}
 	end,
 	frame ! {change_cell, X,Y, Class},
 	{ok,[Coordinates,Nbr,Type,{none, empty}]}.
-
-	
-
-
 
 handle_call({move_herbivore, Animal}, _From, [Coordinates, Nbr, State, T]) ->
 	{X,Y} = Coordinates,
@@ -132,7 +136,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 						0 ->
 							random:seed(now()),
 							Victim = lists:nth(random:uniform(8), Nbr),
-							gen_server:cast(Victim,spawn_plant);
+							gen_server:cast(Victim,{spawn_plant, Growth});
 						_ ->
 							ok
 					end;
@@ -202,18 +206,27 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 	NewAction = {none, empty},
 	{noreply, [Coordinates,Nbr,NewState,NewAction]};
 
-handle_cast(spawn_plant, [{X,Y},Nbr,State|T]) ->
+handle_cast({spawn_plant, ParentGrowth}, [{X,Y},Nbr,State|T]) ->
+	random:seed(now()),
+	NewGrowth = ParentGrowth + (random:uniform(3) - 2), %% GENETICZ
+	case NewGrowth < 1 of
+		true ->
+			Growth = 1;
+		_ ->
+			Growth = NewGrowth
+	end,
+	io:format("(~p, ~p) My growth is ~p~n", [X, Y, Growth]),
 	case element(1, State) of
 		empty ->
-			Class = "plant", 
-			NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
+			Class = "plant",
+			NewState = #life{plant=#plant{class = Class, age = 0, growth = Growth, _ = '_'}, animal=#empty{}},
 			frame ! {change_cell,X,Y,Class};
 		barrier ->
 			NewState = State,
 			ok;
 		_ -> 
 			Class = element(1, State#life.animal),
-			NewState = State#life{plant=#plant{class = "plant", age = 0, growth = 4, _ = '_'}}
+			NewState = State#life{plant=#plant{class = "plant", age = 0, growth = Growth, _ = '_'}}
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
