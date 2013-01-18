@@ -23,8 +23,8 @@ init([Coordinates, C, R, T]) ->
 	{X,Y} = Coordinates,
 	case T of
 		1 -> Class = "plant", Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
-		2 -> Class = "herbivore", Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_'}};
-		3 -> Class = "carnivore", Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_'}};
+		2 -> Class = "herbivore", Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, vision=3,_ = '_'}};
+		3 -> Class = "carnivore", Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, vision=5,_ = '_'}};
 		-1 -> Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ -> Class = "empty", Type = #empty{class = Class, _ = '_'}
 	end,
@@ -90,13 +90,13 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-					lookAround(State),
+					lookAround(State,Nbr),
 					Hunger = Animal#herbivore.hunger,
 					NewAnimal = Animal#herbivore{hunger=Hunger+1},
 					NewAction = Action,
 					ok;
 				carnivore ->
-					lookAround(State),
+					lookAround(State,Nbr),
 					Hunger = Animal#carnivore.hunger,
 					NewAnimal = Animal#carnivore{hunger=Hunger+1},
 					NewAction = Action,
@@ -269,7 +269,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 					NewAction = {none, empty};
 				_ ->
 					NewState = State,
-					NewAction = {goto, getAdjecentAt(To)}
+					NewAction = {goto, getAdjecentAt(Coordinates,Nbr,To)}
 			end;
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
@@ -283,10 +283,10 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 						barrier ->
 							Origin ! {vision_re, Source, Direction, Objects};
 						empty ->
-							Next = getAdjecentAt(Coordinates, Direction),
+							Next = getAdjecentAt(Coordinates, Nbr, Direction),
 							Next ! {vision, Source, Direction, Range-1, Objects, Origin};
 						life ->
-							Next = getAdjecentAt(Coordinates, Direction),
+							Next = getAdjecentAt(Coordinates, Nbr, Direction),
 							Plant = State#life.plant,
 							PlantType = element(1, Plant),
 							Animal = State#life.animal,
@@ -296,25 +296,25 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 									case {PlantType, AnimalType} of
 										{plant, herbivore} ->
 											Next ! {vision, Source, Direction, Range-1,
-												({plant, Range} ++ {herbivore, Range} ++ Objects), Origin};
+												[{plant, Range},{herbivore, Range}|Objects], Origin};
 										{plant, carnivore} ->
 											Next ! {vision, Source, Direction, Range-1,
-												({plant, Range} ++ {carnivore, Range} ++ Objects), Origin};
+												[{plant, Range},{carnivore, Range}|Objects], Origin};
 										{empty, herbivore} ->
 											Next ! {vision, Source, Direction, Range-1,
-												({herbivore, Range} ++ Objects), Origin};
+												[{herbivore, Range}|Objects], Origin};
 										{empty, carnivore} ->
 											Next ! {vision, Source, Direction, Range-1,
-												({carnivore, Range} ++ Objects), Origin};
+												[{carnivore, Range}|Objects], Origin};
 										_ ->
 											Next ! {vision, Source, Direction, Range-1,
-												({plant, Range} ++ Objects), Origin}
+												[{plant, Range}|Objects], Origin}
 									end;
 								carnivore ->
 									case AnimalType of
 										herbivore ->
 											Next ! {vision, Source, Direction, Range-1,
-											({herbivore, Range} ++ Objects), Origin};
+											[{herbivore, Range}|Objects], Origin};
 										_ ->
 											Next ! {vision, Source, Direction, Range-1,
 											Objects, Origin}
@@ -376,31 +376,37 @@ find_aval([H|T],Ack, P) ->
 test() -> 
 	driver ! {step}.
 
-getAdjecentAt ({X,Y}, Direction) ->
+getAdjecentAt ({X,Y}, Nbr,Direction) ->
 	case Direction of
 		n  -> %% North
-			Next = [x, X, y, Y-1];
+			%%Next = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y-1));
+			Next = lists:nth(2, Nbr);
 		ne -> %% Northeast
-			Next = [x, X+1, y, Y-1];
+			%%Next = ["x", X+1, y, Y-1];
+			Next = lists:nth(3, Nbr);
 		e  -> %% East
-			Next = [x, X+1, y, Y];
+			%%Next = ["x", X+1, y, Y];
+			Next = lists:nth(5, Nbr);
 		se -> %% Southeast
-			Next = [x, X+1, y, Y+1];
+			%%Next = ["x", X+1, y, Y+1];
+			Next = lists:nth(8, Nbr);
 		s  -> %% South
-			Next = [x, X, y, Y+1];
+			%%Next = ["x", X, y, Y+1];
+			Next = lists:nth(7, Nbr);
 		sw -> %% Southwest
-			Next = [x, X-1, y, Y+1];
+			%%Next = ["x", X-1, y, Y+1];
+			Next = lists:nth(6, Nbr);
 		w  -> %% West
-			Next = [x, X-1, y, Y];
-		nw -> %% Northwest
-			Next = [x, X-1, y, Y-1];
-		_ ->  %% ???
-			Next = [x, X, y, Y]
+			%%Next = ["x", X-1, y, Y];
+			Next = lists:nth(4, Nbr);
+		_ -> %% Northwest
+			%%Next = ["x", X-1, y, Y-1];
+			Next = lists:nth(1, Nbr)
 	end,
-	list_to_atom(Next).
+	Next.
 
 
-lookAround (State) ->
+lookAround (State,Nbr) ->
 	Animal = State#life.animal,
 	AnimalType = element(1, Animal),
 	case AnimalType of
@@ -448,7 +454,7 @@ visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To
 		false ->
 			To ! {move, BestDir}
 	end;
-visionDataCollector (n, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+visionDataCollector (N, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
 	receive
 		{vision_re, Source, Direction, Objects} ->
 			case AnimalType of
@@ -461,13 +467,13 @@ visionDataCollector (n, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To
 			end,
 			case (Value > BestVal) of
 				true -> 
-					visionDataCollector (n-1, AnimalType, {Direction, Value}, {WorstDir, WorstVal}, To);
+					visionDataCollector (N-1, AnimalType, {Direction, Value}, {WorstDir, WorstVal}, To);
 				false ->
 					case (Value < WorstVal) of
 						true ->
-							visionDataCollector (n-1, AnimalType, {BestDir, BestVal}, {Direction, Value}, To);
+							visionDataCollector (N-1, AnimalType, {BestDir, BestVal}, {Direction, Value}, To);
 						false ->
-							visionDataCollector (n-1, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To)
+							visionDataCollector (N-1, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To)
 					end
 			end
 	end.
