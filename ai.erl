@@ -104,3 +104,25 @@ getAdjecentAt ({X,Y}, Max_X, Max_Y, Direction) ->
 		_ -> Next = [x, X, y, Y]
 	end,
 	list_to_atom(Next).
+
+lookAround () ->
+	(lists:nth(1, Nbr)
+
+
+
+	Neighbours =
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, n), n} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, ne), ne} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, e), e} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, se), se} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, s), s} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, sw), sw} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, w), w} ++
+		{getAdjecentAt(Coordinates, Max_X, Max_Y, nw), nw},
+	lists:foreach(fun({PID, Direction}) -> N ! (vision, Source, Direction, Range, [], self()), Neighbours),
+	Collector = spawn(?MODULE, visionDataCollector, []).
+
+visionDataCollector (N, NE, E, SE, S, SW, W, NW) -> ok.
+	receive
+		{vision_re, Source, n, Objects} -> ok;
+		{vision_re, Source, ne, Objects} -> ok;
