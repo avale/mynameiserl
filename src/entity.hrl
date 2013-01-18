@@ -4,10 +4,10 @@
 -record(plant, {class="plant", age=0, growth, food}).
 
 %% State of a herivore cell
--record(herbivore, {class="herbivore", age=0, growth, speed, hunger=0, vision, food}).
+-record(herbivore, {class="herbivore", age=0, growth, speed, hunger=0, starvation=10, vision, food}).
 
 %% State of a carnivore cell
--record(carnivore, {class="carnivore", age=0, growth, speed, hunger=0, vision}).
+-record(carnivore, {class="carnivore", age=0, growth, speed, hunger=0, starvation=10, vision}).
 
 %% State of a barrier cell
 -record(barrier, {class="barrier"}).
