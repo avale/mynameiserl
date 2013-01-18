@@ -256,36 +256,50 @@ handle_cast({spawn_plant, ParentGrowth}, [{X,Y},Nbr,State|T]) ->
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
+handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
+	case element(1, State) of
+		empty -> 
+			NewState = #life{animal= Animal},
+			From ! {move_here, empty};
+		barrier ->
+			NewState = State,
+			From ! {dont_move};
+		life ->
+			case element(1, State#life.animal) of
+				empty ->
+					NewState = State#life{animal= Animal},
+					From ! {move_here};
+				_ -> 
+				io:format("Här kraschade vi förrut ~n"),
+				NewState = State,
+				From ! {dont_move}
+			end
+		_ ->
+			NewState = State
+	end,
+	{noreply, [Coor, Nbr, NewState, Action]}
+
 handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 	{noreply, [Coordinates,Nbr,State|_T]}.
 
 
 handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 	case Info of
-		{spawn_herbivore, From} ->
+		{move_here} ->
+			io:format("Mooverooo!!!~n"),
+			case element(1, State#life.plant) of
+				{X,Y} = Coordinates,
+				plant -> 
+					NewState = State#life(animal= #empty{}),
+					frame ! {change_cell, X, Y, "plant"};
+				_ -> 
+					NewState = #empty{};
+					frame ! {change_cell, X, Y, "empty"} 
+			end,
+			NewAction = {none, empty};
+		{dont_move} -> 
 			NewState = State,
-			NewAction = {none, empty},
-			From ! gen_server:call(self(), spawn_herbivore);
-		{spawn_carnicore, From} ->
-			NewState = State,
-			NewAction = {none, empty},
-			From ! gen_server:call(self(), spawn_carnivore);
-		{move_herbivore, From} ->
-			NewState = State,
-			NewAction = {none, empty},
-			From ! gen_server:call(self(), move_herbivore);
-		{move_carnivore, From} ->
-			NewState = State,
-			NewAction = {none, empty},
-			From ! gen_server:call(self(), move_carnivore);
-		{eat_grass, From} ->
-			NewState = State,
-			NewAction = {none, empty},
-			From ! gen_server:call(self(), eat_grass);
-		{eat_herbivore, From} ->
-			NewState = State,
-			NewAction = {none, empty},
-			From ! gen_server:call(self(), eat_herbivore);
+			NewAction = {none, empty};
 		{move, To} ->
 			io:format("Jag ska till: ~p~n", [To]),
 			NewState = State,
