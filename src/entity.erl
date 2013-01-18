@@ -287,3 +287,6 @@ find_aval([H|T],Ack,_) ->
 		_ ->
 			find_aval(T, Ack)
 	end.
+
+test() -> 
+	driver ! {step}.
