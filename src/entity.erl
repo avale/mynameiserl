@@ -93,6 +93,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 					spawn(?MODULE, find_aval, [Nbr,[], self()]),
 					Hunger = Animal#herbivore.hunger,
 					NewAnimal = Animal#herbivore{hunger=Hunger+1},
+					NewAction = Action,
 					ok;
 				carnivore ->
 					Hunger = Animal#carnivore.hunger,
@@ -258,6 +259,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 		_ -> 
 			io:format("~p: Undefined message: ~p~n",[Coordinates, Info]),
 			gen_server:cast(self(), tock),
+			NewAction = {none, empty},
 			NewState = State
 	end,
 	{noreply, [Coordinates,Nbr,NewState,NewAction]}.
@@ -289,7 +291,7 @@ find_aval([],Ack,P) ->
 			Victim = lists:nth(random:uniform(length(Ack)), Ack),
 			P ! {move, Victim}
 	end;
-find_aval([H|T],Ack,_) ->
+find_aval([H|T],Ack, P) ->
 	Next = try gen_server:call(H, is_notAnimal, 50)
 		   catch
 				Error:Reason ->
@@ -298,11 +300,11 @@ find_aval([H|T],Ack,_) ->
 		   end,
 	case Next of
 		false ->
-			find_aval(T, Ack);
-		{yes, P} ->
-			find_aval(T, [P|Ack]);
+			find_aval(T, Ack, P);
+		{yes, Pid} ->
+			find_aval(T, [Pid|Ack], P);
 		_ ->
-			find_aval(T, Ack)
+			find_aval(T, Ack, P)
 	end.
 
 test() -> 
