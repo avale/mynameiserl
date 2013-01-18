@@ -12,7 +12,7 @@ start_cell(Coordinates, C, R, T) ->
 	{X, Y} = Coordinates,
 	Name = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y)),
 	io:format("Hej: ~p~n",[Name]),
-	gen_server:start_link({local,Name},?MODULE,[Coordinates, C, R, T],[]).
+	gen_server:start({local,Name},?MODULE,[Coordinates, C, R, T],[]).
 
 %% ====================================================================
 %% callback functions
@@ -98,7 +98,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 							random:seed(now()),
 							Victim = lists:nth(random:uniform(length(Aval)), Aval),
 							NewAction = {goto, Victim},
-							io:format("[~p|PLING]: JAG VIIIILLL TIIIILL ~p~n",[Coordinates,Victim])
+							io:format("[~p|PLING]: JAG VILL TILL ~p~n",[Coordinates,Victim])
 					end,
 					NewAnimal = Animal#herbivore{},
 					ok;
@@ -149,8 +149,8 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 				herbivore ->
 					case Action of
 						{goto, Target} ->
-							io:format("[~p|PLONG]: JAG GAAAAAAR TIIIILL ~p~n",[Coordinates,Target]),
-							NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
+							io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
+							NewAnimal = gen_server:call(Target, {move_herbivore, Animal})},
 							case element(1, State#life.plant) of
 								plant ->
 									NewState = State#life{animal= NewAnimal},
@@ -169,7 +169,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 					ok;
 				_ ->
 					NewState = State,
-					ok
+					ok 
 			end
 	end,
 	NewAction = {none, empty},
