@@ -110,4 +110,4 @@ step() ->
         driver ! {step}.
 
 setup() ->
-	driver ! {set_up, "test.txt", 27, 10}.
+	driver ! {set_up, "test.txt", 27, 27}.
