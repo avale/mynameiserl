@@ -150,7 +150,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 					case Action of
 						{goto, Target} ->
 							io:format("[~p|PLONG]: JAG GAR TILL ~p~n",[Coordinates,Target]),
-							NewAnimal = gen_server:call(Target, {move_herbivore, Animal})},
+							NewAnimal = gen_server:call(Target, {move_herbivore, Animal}),
 							case element(1, State#life.plant) of
 								plant ->
 									NewState = State#life{animal= NewAnimal},

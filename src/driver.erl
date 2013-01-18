@@ -67,9 +67,9 @@ loop(P, E, W, H) ->
                         lists:map(fun(X) -> gen_server:cast(X, stop) end, P),
                         driver:loop(P,E,W,H);
                 {step} ->
-                        lists:map((fun (X) -> gen_server:cast(X, tick) end), L),
+                        lists:map((fun (X) -> gen_server:cast(X, tick) end), P),
                         timer:sleep(1000),
-                        lists:map((fun (X) -> gen_server:cast(X, tock) end), L);
+                        lists:map((fun (X) -> gen_server:cast(X, tock) end), P);
                 _ ->
                         io:format("Driver: Undefined message~n",[])
         end,
@@ -104,3 +104,6 @@ tock_new(L) ->
 
 step() ->
         driver ! {step}.
+
+setup() ->
+	driver ! {set_up, "test.txt", 27, 10}.
