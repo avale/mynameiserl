@@ -184,7 +184,24 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 					end,
 					ok;
 				carnivore ->
-					NewState = State,
+					Hunger = Animal#carnivore.hunger,
+					Starvation = Animal#carnivore.starvation,
+					case Hunger > Starvation of
+						true ->
+							case element(1, State#life.plant) of
+								plant ->
+									NewState = State#life{animal=#empty{}},
+									New = "plant";
+								_ -> 
+									NewState = #empty{},
+									New = "empty"
+							end,
+							io:format("[~p, ~p] Meeeh~n",[X, Y]),
+							frame ! {change_cell, X, Y, New};
+						_ ->
+							NewState = State,
+							ok
+					end,
 					ok;
 				_ ->
 					NewState = State,
