@@ -27,10 +27,10 @@ init([Coordinates, C, R, T]) ->
 			Type = #life{plant=#plant{class = Class, growth = 4, age=0, _ = '_'}, animal=#empty{}};
 		2 ->
 			Class = "herbivore",
-			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_'}};
+			Type = #life{plant=#empty{}, animal=#herbivore{class = Class, hunger=0, starvation=10, _ = '_', vision=3}};
 		3 ->
 			Class = "carnivore",
-			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_'}};
+			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, hunger=0, starvation=10, _ = '_', vision=5}};
 		-1 ->
 			Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ ->
@@ -439,6 +439,7 @@ lookAround (State,Nbr) ->
 	(lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
 
 visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+	io:format("visionDataCollector basecase"),
 	case (WorstVal >= BestVal) of
 		true ->
 			case WorstDir of
