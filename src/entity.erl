@@ -200,9 +200,12 @@ handle_cast(spawn_plant, [{X,Y},Nbr,State|T]) ->
 			Class = "plant", 
 			NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
 			frame ! {change_cell,X,Y,Class};
-		_ ->
+		barrier ->
 			NewState = State,
-			ok
+			ok;
+		_ -> 
+			Class = element(1, State#life.animal),
+			NewState = State#life{plant=#plant{class = "plant", age = 0, growth = 4, _ = '_'}}
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
