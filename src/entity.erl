@@ -53,7 +53,7 @@ handle_call(is_notAnimal, _From, [Coordinates,Nbr,State|T]) ->
 		empty -> Reply = self();
 		barrier -> Reply = false;
 		life -> 
-			case State#life.animal of
+			case element(1, State#life.animal) of
 				empty -> Reply = self();
 				_ -> Reply = false
 			end
