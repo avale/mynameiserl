@@ -66,6 +66,10 @@ loop(P, E, W, H) ->
                         exit(whereis(clock), kill),
                         lists:map(fun(X) -> gen_server:cast(X, stop) end, P),
                         driver:loop(P,E,W,H);
+                {step} ->
+                        lists:map((fun (X) -> gen_server:cast(X, tick) end), L),
+                        timer:sleep(1000),
+                        lists:map((fun (X) -> gen_server:cast(X, tock) end), L);
                 _ ->
                         io:format("Driver: Undefined message~n",[])
         end,
@@ -97,3 +101,6 @@ tock_new(L) ->
         timer:sleep(2000),
         lists:map((fun (X) -> gen_server:cast(X, tock) end), L),
         tick_new(L).
+
+step() ->
+        driver ! {step}.
