@@ -103,17 +103,30 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-					lookAround(State,Nbr),
-					Hunger = Animal#herbivore.hunger,
-					NewAnimal = Animal#herbivore{hunger=Hunger+1},
-					ok;
+					case is_food(Nbr, plant) of
+						{_,Pid} -> 
+							NewAction = {eat, Pid},
+							NewAnimal = Animal;
+						_ ->
+							lookAround(State,Nbr),
+							Hunger = Animal#herbivore.hunger,
+							NewAnimal = Animal#herbivore{hunger=Hunger+1},
+							NewAction = Action,
+					end;
 				carnivore ->
-					lookAround(State,Nbr),
-					Hunger = Animal#carnivore.hunger,
-					NewAnimal = Animal#carnivore{hunger=Hunger+1},
-					ok;
+					case is_food(Nbr, herbivore) of
+						{_,Pid} -> 
+							NewAction = {eat, Pid},
+							NewAnimal = Animal;
+						_ ->
+							lookAround(State,Nbr),
+							Hunger = Animal#carnivore.hunger,
+							NewAnimal = Animal#carnivore{hunger=Hunger+1},
+							NewAction = Action
+					end;
 				_ ->
 					NewAnimal = Animal#empty{},
+					NewAction = Action
 					ok
 			end,
 			NewState = State#life{plant=NewPlant, animal=NewAnimal}
@@ -184,7 +197,10 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 													New = "empty"
 											end,
 											frame ! {change_cell, X, Y, New}
-									end;									
+									end;
+								{eat,Pid} ->
+									io:format("~p: OMNOMNOMNOM!", [Coordinates]),
+																		
 								{none, _} ->
 									NewState = State
 							end
@@ -406,6 +422,9 @@ find_aval([H|T],Ack, P) ->
 			find_aval(T, Ack, P)
 	end.
 
+is_food(Nbr, Food) ->
+	lists:keymember(Food, 1, Nbr).
+
 test() -> 
 	driver ! {step}.
 
@@ -531,3 +550,8 @@ carnivoreProspect ([{Object, Range} | Rest], Acc) ->
 		_ ->
 			carnivoreProspect(Rest, Acc)
 	end.
+
+boradcast(Nbr, Message, From) ->
+	{C,R} = From,
+	Name = list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)),
+	lists:map(fun(X) -> X ! {Message, From} end, Nbr).
