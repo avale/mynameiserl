@@ -1,4 +1,5 @@
 -module(helpers).
+-include("entity.hrl").
 -compile(export_all).
 
 sur_nodes({X,Y}, Max_X, Max_Y) ->
@@ -35,7 +36,7 @@ find_aval([H|T],Ack, P) ->
 test() -> 
 	driver ! {step}.
 
-getAdjecentAt ({X,Y}, Nbr,Direction) ->
+getAdjecentAt ({_X,_Y}, Nbr,Direction) ->
 	case Direction of
 		n  -> %% North
 			%%Next = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y-1));
@@ -89,7 +90,7 @@ lookAround (State,Nbr) ->
 	(lists:nth(7, Nbr)) ! {vision, AnimalType, s, VisionRange, [], DataCollector},
 	(lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
 
-visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
+visionDataCollector (8, _AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
 	case (WorstVal >= BestVal) of
 		true ->
 			case WorstDir of
@@ -115,7 +116,7 @@ visionDataCollector (8, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To
 	end;
 visionDataCollector (N, AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
 	receive
-		{vision_re, Source, Direction, Objects} ->
+		{vision_re, _Source, Direction, Objects} ->
 			case AnimalType of
 				herbivore ->
 					Value = herbivoreProspect(Objects, 0);
