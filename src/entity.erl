@@ -90,23 +90,10 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-<<<<<<< HEAD
-					Aval = find_aval(Nbr),
-=======
-					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal, 500) end, Nbr), Bool =/= false],
->>>>>>> bb8fbb2c045f950b535316072adbb7ab0b5976c4
-					case Aval of
-						[] ->
-							NewAction = Action,
-							ok;
-						_ -> 
-							random:seed(now()),
-							Victim = lists:nth(random:uniform(length(Aval)), Aval),
-							NewAction = {goto, Victim},
-							io:format("[~p|PLING]: JAG VILL TILL ~p~n",[Coordinates,Victim])
-					end,
+					spawn(?MODULE, find_aval, [Nbr,[], self()]),
 					Hunger = Animal#herbivore.hunger,
 					NewAnimal = Animal#herbivore{hunger=Hunger+1},
+					NewAction = Action,
 					ok;
 				carnivore ->
 					Hunger = Animal#carnivore.hunger,
@@ -166,6 +153,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 									NewState = #empty{},
 									New = "empty"
 							end,
+							io:format("[~p, ~p] Aaaaaaargh~n",[X, Y]),
 							frame ! {change_cell, X, Y, New};
 						_ ->
 							case Action of
@@ -187,7 +175,24 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 					end,
 					ok;
 				carnivore ->
-					NewState = State,
+					Hunger = Animal#carnivore.hunger,
+					Starvation = Animal#carnivore.starvation,
+					case Hunger > Starvation of
+						true ->
+							case element(1, State#life.plant) of
+								plant ->
+									NewState = State#life{animal=#empty{}},
+									New = "plant";
+								_ -> 
+									NewState = #empty{},
+									New = "empty"
+							end,
+							io:format("[~p, ~p] Meeeh~n",[X, Y]),
+							frame ! {change_cell, X, Y, New};
+						_ ->
+							NewState = State,
+							ok
+					end,
 					ok;
 				_ ->
 					NewState = State,
@@ -203,9 +208,12 @@ handle_cast(spawn_plant, [{X,Y},Nbr,State|T]) ->
 			Class = "plant", 
 			NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}},
 			frame ! {change_cell,X,Y,Class};
-		_ ->
+		barrier ->
 			NewState = State,
-			ok
+			ok;
+		_ -> 
+			Class = element(1, State#life.animal),
+			NewState = State#life{plant=#plant{class = "plant", age = 0, growth = 4, _ = '_'}}
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
@@ -215,35 +223,46 @@ handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 
 handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 	case Info of
-		{spawn_plant, From} ->
-			case element(1, State) of
-				empty ->
-					Class = "plant", 
-					NewState = #life{plant=#plant{class = Class, age = 0, growth = 4, _ = '_'}, animal=#empty{}};
-				_ ->
-					NewState = State,
-					ok
-			end;
 		{spawn_herbivore, From} ->
 			NewState = State,
+			NewAction = {none, empty},
 			From ! gen_server:call(self(), spawn_herbivore);
 		{spawn_carnicore, From} ->
 			NewState = State,
+			NewAction = {none, empty},
 			From ! gen_server:call(self(), spawn_carnivore);
 		{move_herbivore, From} ->
 			NewState = State,
+			NewAction = {none, empty},
 			From ! gen_server:call(self(), move_herbivore);
 		{move_carnivore, From} ->
 			NewState = State,
+			NewAction = {none, empty},
 			From ! gen_server:call(self(), move_carnivore);
 		{eat_grass, From} ->
 			NewState = State,
+			NewAction = {none, empty},
 			From ! gen_server:call(self(), eat_grass);
 		{eat_herbivore, From} ->
 			NewState = State,
-			From ! gen_server:call(self(), eat_herbivore)
+			NewAction = {none, empty},
+			From ! gen_server:call(self(), eat_herbivore);
+		{move, To} ->
+			case To of
+				no -> 
+					NewState = State,
+					NewAction = {none, empty};
+				_ ->
+					NewState = State,
+					NewAction = {goto, To}
+			end;
+		_ -> 
+			io:format("~p: Undefined message: ~p~n",[Coordinates, Info]),
+			gen_server:cast(self(), tock),
+			NewAction = {none, empty},
+			NewState = State
 	end,
-	{noreply, [Coordinates,Nbr,NewState]}.
+	{noreply, [Coordinates,Nbr,NewState,NewAction]}.
 
 terminate(_Reason, State) ->
 	{X,Y} = hd(State),
@@ -263,13 +282,30 @@ sur_nodes({X,Y}, Max_X, Max_Y) ->
 			Xn >= 0, Xn < Max_X, Yn >=0, Yn < Max_Y, {Xn, Yn} =/= {X,Y}],
 	lists:map(fun({C,R}) -> list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)) end ,L).
 
-find_aval([],Ack) -> Ack;
-find_aval([H|T],Ack) ->
-	try gen_server:call(H, is_notAnimal, 100) of
-		false -> Next = Ack;
-		{yes, P} -> Next = [P|Ack]
-	catch
-		Error:Reason ->
-			io:format("I aint touching that!: ~p~n", [H])
-	end,
-	find_aval(T, Next).
+find_aval([],Ack,P) ->
+	case Ack of
+		[] ->
+			P ! {move, no};
+		_ -> 
+			random:seed(now()),
+			Victim = lists:nth(random:uniform(length(Ack)), Ack),
+			P ! {move, Victim}
+	end;
+find_aval([H|T],Ack, P) ->
+	Next = try gen_server:call(H, is_notAnimal, 50)
+		   catch
+				Error:Reason ->
+					io:format("I aint touching that!: ~p~n", [H]),
+					false
+		   end,
+	case Next of
+		false ->
+			find_aval(T, Ack, P);
+		{yes, Pid} ->
+			find_aval(T, [Pid|Ack], P);
+		_ ->
+			find_aval(T, Ack, P)
+	end.
+
+test() -> 
+	driver ! {step}.
