@@ -90,11 +90,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			case AnimalType of
 				herbivore ->
-<<<<<<< HEAD
-					Aval = find_aval(Nbr),
-=======
-					Aval = [Bool|| Bool <- lists:map(fun(N) -> gen_server:call(N, is_notAnimal, 500) end, Nbr), Bool =/= false],
->>>>>>> bb8fbb2c045f950b535316072adbb7ab0b5976c4
+					Aval = find_aval(Nbr,[]),
 					case Aval of
 						[] ->
 							NewAction = Action,
@@ -166,6 +162,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 									NewState = #empty{},
 									New = "empty"
 							end,
+							io:format("[~p, ~p] Aaaaaaargh~n",[X, Y]),
 							frame ! {change_cell, X, Y, New};
 						_ ->
 							case Action of
@@ -241,7 +238,11 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 			From ! gen_server:call(self(), eat_grass);
 		{eat_herbivore, From} ->
 			NewState = State,
-			From ! gen_server:call(self(), eat_herbivore)
+			From ! gen_server:call(self(), eat_herbivore);
+		_ -> 
+			io:format("~p: Undefined message: ~p~n",[Coordinates, Info]),
+			gen_server:cast(self(), tock),
+			NewState = State
 	end,
 	{noreply, [Coordinates,Nbr,NewState]}.
 
@@ -265,11 +266,17 @@ sur_nodes({X,Y}, Max_X, Max_Y) ->
 
 find_aval([],Ack) -> Ack;
 find_aval([H|T],Ack) ->
-	try gen_server:call(H, is_notAnimal, 100) of
-		false -> Next = Ack;
-		{yes, P} -> Next = [P|Ack]
-	catch
-		Error:Reason ->
-			io:format("I aint touching that!: ~p~n", [H])
-	end,
-	find_aval(T, Next).
+	Next = try gen_server:call(H, is_notAnimal, 50)
+		   catch
+				Error:Reason ->
+					io:format("I aint touching that!: ~p~n", [H]),
+					false
+		   end,
+	case Next of
+		false ->
+			find_aval(T, Ack);
+		{yes, P} ->
+			find_aval(T, [P|Ack]);
+		_ ->
+			find_aval(T, Ack)
+	end.
