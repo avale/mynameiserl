@@ -11,7 +11,6 @@
 start_cell(Coordinates, C, R, T) ->
 	{X, Y} = Coordinates,
 	Name = list_to_atom("x" ++ integer_to_list(X) ++ "y" ++ integer_to_list(Y)),
-	io:format("Hej: ~p~n",[Name]),
 	gen_server:start({local,Name},?MODULE,[Coordinates, C, R, T],[]).
 
 %% ====================================================================
@@ -29,10 +28,10 @@ init([Coordinates, C, R, T]) ->
 			Class = "herbivore",
 			Type = #life{
 						plant=#empty{},
-						animal=#herbivore{class = Class, age=0, hunger=0, vision=variables:herbivoreVision(), _ = '_', starvation=variables:herbivoreStarvation()}};
+						animal=#herbivore{class = Class, age=0, hunger=0, exited=0, vision=variables:herbivoreVision(), _ = '_', starvation=variables:herbivoreStarvation()}};
 		3 ->
 			Class = "carnivore",
-			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, age=0, hunger=0, vision=variables:carnivoreVision(), _ = '_', starvation=variables:carnivoreStarvation()}};
+			Type = #life{plant=#empty{}, animal=#carnivore{class = Class, age=0, hunger=0, exited=0, vision=variables:carnivoreVision(), _ = '_', starvation=variables:carnivoreStarvation()}};
 		-1 ->
 			Class = "barrier", Type = #barrier{class = Class, _ = '_'};
 		_ ->
@@ -81,19 +80,16 @@ handle_call(is_notAnimal, _From, [Coordinates,Nbr,State|T]) ->
 handle_cast(stop, State) ->
 	{stop, shutdown, State};
 
-handle_cast(broadcast, [Coordinates,Nbr,State]) ->
-	Type = element(1, State),
-	io:format("BROADCAST: My type is ~p!~n",[Type]),
-	broadcast(Nbr, Type, Coordinates);
-
 handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 	Type = element(1, State),
 	case Type of
 		empty ->
 			NewState = State,
+			NewAction = Action,
 			ok;
 		barrier ->
 			NewState = State,
+			NewAction = Action,
 			ok;
 		life ->
 			Plant = State#life.plant,
@@ -112,13 +108,14 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 				herbivore ->
 					case is_food(Nbr, plant) of
 						{Pid,_} -> 
-							io:format("Yummy yummy!~n"),
 							NewAction = {eat, Pid},
 							NewAnimal = Animal;
 						_ ->
 							lookAround(State,Nbr),
 							Hunger = Animal#herbivore.hunger,
-							NewAnimal = Animal#herbivore{hunger=Hunger+1},
+							Age = Animal#herbivore.age,
+							Exited = Animal#herbivore.exited,
+							NewAnimal = Animal#herbivore{hunger=Hunger+1, age=Age+1, exited=Exited+1},
 							NewAction = Action
 					end;
 				carnivore ->
@@ -129,7 +126,9 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 						_ ->
 							lookAround(State,Nbr),
 							Hunger = Animal#carnivore.hunger,
-							NewAnimal = Animal#carnivore{hunger=Hunger+1},
+							Age = Animal#carnivore.age,
+							Exited = Animal#carnivore.exited,
+							NewAnimal = Animal#carnivore{hunger=Hunger+1, age=Age+1, exited=Exited+1},
 							NewAction = Action
 					end;
 				_ ->
@@ -139,7 +138,7 @@ handle_cast(tick, [Coordinates,Nbr,State,Action]) ->
 			end,
 			NewState = State#life{plant=NewPlant, animal=NewAnimal}
 	end,
-	{noreply, [Coordinates, Nbr, NewState,Action]};
+	{noreply, [Coordinates, Nbr, NewState,NewAction]};
 
 handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 	{X,Y} = Coordinates,
@@ -194,7 +193,6 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 									NewState = State,
 									gen_server:cast(Target, {move_animal, Animal, self()});									
 								{eat,Pid} ->
-									io:format("~p: OMNOMNOMNOM, Weed!", [Coordinates]),
 									gen_server:cast(Pid, {eaten, plant, self()}),
 									NewState = State;
 								{none, _} ->
@@ -224,8 +222,7 @@ handle_cast(tock, [Coordinates,Nbr,State,Action]) ->
 									NewState = State,
 									gen_server:cast(Target, {move_animal, Animal, self()});
 								{eat,Pid} ->
-									io:format("~p: OMNOMNOMNOM, Rabbit!", [Coordinates]),
-									gen_server:cast(Pid, {eaten, animal, self()}),
+									gen_server:cast(Pid, {eaten, herbivore, self()}),
 									NewState = State;
 								{none, _} ->
 									NewState = State
@@ -286,68 +283,64 @@ handle_cast({spawn_animal, Animal}, [{X,Y},Nbr,State|T]) ->
 					broadcast(Nbr,carnivore,{X,Y}),
 					frame ! {change_cell,X,Y,"carnivore"};
 				_ ->
-					NewState = State,
-					io:format("What is this animal? Is this dog?~n")
+					NewState = State
 			end;
 		life ->
 			case element(1, State#life.animal) of
 				empty ->
+					Plant = State#life.plant,
 					case AnimalType of
 						herbivore ->
 							ParentVision = Animal#herbivore.vision,
 							ParentStarvation = Animal#herbivore.starvation,
 							{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
-							NewState = #life{animal=#herbivore{class="herbivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+							NewState = #life{plant=Plant, animal=#herbivore{class="herbivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
 							broadcast(Nbr,herbivore,{X,Y}),
 							frame ! {change_cell,X,Y,"herbivore"};
 						carnivore ->
 							ParentVision = Animal#carnivore.vision,
 							ParentStarvation = Animal#carnivore.starvation,
 							{Vision, Starvation} = generateGenetics(ParentVision, ParentStarvation),
-							NewState = #life{animal=#carnivore{class="carnivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
+							NewState = #life{plant=Plant, animal=#carnivore{class="carnivore", age=0, hunger=0, vision=Vision, starvation=Starvation}},
 							broadcast(Nbr,carnivore,{X,Y}),
 							frame ! {change_cell,X,Y,"carnivore"};
 						_ ->
-							NewState = State,
-							io:format("What is this animal? Is this dog?~n")
+							NewState = State
 					end;
 				_ ->
 					NewState = State
 			end;
 		_ ->
-			NewState = State,
-			io:format("(spawn_animal) I am neither barrier nor life nor empty... What am I?!~n")
+			NewState = State
 	end,
 	{noreply, [{X,Y},Nbr,NewState|T]};
 
 handle_cast({eaten, Type, From}, [Coor,Nbr,State,Action]) ->
-	io:format("Shit's gonna get eaten, bro!~n"),
+	{X,Y} = Coor,
 	case element(1, State) of
 		life ->
 			case Type of
 				herbivore ->
-					io:format("Fuck you kompis! Ät honom ->"),
 					NewAction = {none, empty},
 					NewState = State#life{animal= #empty{}},
 					broadcast(Nbr,element(1, State#life.plant),Coor),
-					from ! {im_done};
+					frame ! {change_cell,X,Y,element(1, State#life.plant)},
+					From ! {im_done};
 				plant ->
-					io:format("Duuuude, weeeed.....!!!"),
 					NewAction = {none, empty},
 					NewState = State#life{plant= #empty{}},
 					broadcast(Nbr,empty,Coor),
-					from ! {im_done};
+					frame ! {change_cell,X,Y,"empty"},
+					From ! {im_done};
 				_ ->
-					io:format("Eaten?!?! Aint nobody got time for dat!"),
 					NewState = State,
 					NewAction = Action,
-					from ! {not_eaten}
+					From ! {not_eaten}
 			end;
 		_ ->
-			io:format("Eaten?!?! Aint nobody got time for dat!"),
 			NewState = State,
 			NewAction = Action,
-			from ! {not_eaten}
+			From ! {not_eaten}
 	end,
 	{noreply, [Coor,Nbr,NewState,NewAction]};
 
@@ -370,7 +363,6 @@ handle_cast({move_animal, Animal, From}, [Coor, Nbr, State, Action]) ->
 					broadcast(Nbr,element(1, Animal),Coor),
 					From ! {move_here};
 				_ -> 
-				io:format("Här kraschade vi förrut ~n"),
 				NewState = State,
 				From ! {dont_move}
 			end;
@@ -383,22 +375,57 @@ handle_cast(_, [Coordinates,Nbr,State|_T]) ->
 	{noreply, [Coordinates,Nbr,State|_T]}.
 
 
-handle_info(Info, [Coordinates,Nbr,State|_T]) ->
+handle_info(Info, [Coordinates,Nbr,State,Action]) ->
 	case Info of
 		{new_type,Type,From} ->
 			NewNbr = lists:keyreplace(From, 1, Nbr, {From, Type}),
 			NewState = State,
-			%%io:format("I (~p) received ~p from ~p, so now my neighbours is:~p!~n",[Coordinates, Type, From, NewNbr]),
-			NewAction = {none, empty};
+			NewAction = Action;
 		{not_eaten} ->
-			io:format("I was not eaten ^^!~n"),
 			NewState = State,
 			NewNbr = Nbr,
-			NewAction = {none, empty}; 
+			NewAction = Action;
 		{im_done} ->
-			NewState = State,
+			Animal = State#life.animal,
+			case element(1, Animal) of
+				herbivore ->
+					Age = Animal#herbivore.age,
+					MatureAge = variables:herbivoreMatureAge(),
+					case Animal#herbivore.exited >= variables:herbivoreCooldownTime() of
+						true when Age >= MatureAge ->
+							NewExited = 0,
+							case is_empty(Nbr) of
+								{Pid, _} ->
+									gen_server:cast(Pid, {spawn_animal, Animal});
+								_ ->
+									ok
+							end;
+						_ ->
+							NewExited = Animal#herbivore.exited
+					end,
+					NewAnimal = Animal#herbivore{hunger=0, exited=NewExited};
+				carnivore ->
+					Age = Animal#carnivore.age,
+					MatureAge = variables:carnivoreMatureAge(),
+					case Animal#carnivore.exited >= variables:carnivoreCooldownTime() of
+						true when Age >= MatureAge ->
+							NewExited = 0,
+							case is_empty(Nbr) of
+								{Pid, _} ->
+									gen_server:cast(Pid, {spawn_animal, Animal});
+								_ ->
+									ok
+							end;
+						_ ->
+							NewExited = Animal#carnivore.exited
+					end,
+					NewAnimal = Animal#carnivore{hunger=0, exited=NewExited};
+				_ ->
+					NewAnimal = #empty{}
+			end,
+			NewState = State#life{animal=NewAnimal},
 			NewNbr = Nbr,
-			NewAction = {none, empty}; 
+			NewAction = Action;
 		{move_here} ->
 			{X,Y} = Coordinates,
 			case element(1, State#life.plant) of
@@ -412,11 +439,11 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 					frame ! {change_cell, X, Y, "empty"} 
 			end,
 			NewNbr = Nbr,
-			NewAction = {none, empty};
+			NewAction = Action;
 		{dont_move} -> 
 			NewState = State,
 			NewNbr = Nbr,
-			NewAction = {none, empty};
+			NewAction = Action;
 		{move, To} ->
 			NewState = State,
 			NewNbr = Nbr,
@@ -424,7 +451,7 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 		{vision, Source, Direction, Range, Objects, Origin} ->
 			NewState = State,
 			NewNbr = Nbr,
-			NewAction = {none, empty},
+			NewAction = Action,
 			case Range>0 of
 				false ->
 					Origin ! {vision_re, Source, Direction, Objects};
@@ -474,9 +501,8 @@ handle_info(Info, [Coordinates,Nbr,State|_T]) ->
 					end
 			end;
 		_ -> 
-			io:format("~p: Undefined message: ~p~n",[Coordinates, Info]),
 			gen_server:cast(self(), tock),
-			NewAction = {none, empty},
+			NewAction = Action,
 			NewNbr = Nbr,
 			NewState = State
 	end,
@@ -513,7 +539,6 @@ find_aval([H|T],Ack, P) ->
 	Next = try gen_server:call(H, is_notAnimal, 50)
 		   catch
 				Error:Reason ->
-					io:format("I aint touching that!: ~p~n", [H]),
 					false
 		   end,
 	case Next of
@@ -526,10 +551,10 @@ find_aval([H|T],Ack, P) ->
 	end.
 
 is_food(Nbr, Food) ->
-	%%io:format("I am food of type ~p and here is list ~p~n",[Food, Nbr]),
-	Result = lists:keyfind(Food, 2, Nbr),
-	%%io:format("Result is ~p~n",[Result]),%%
-	Result.
+	lists:keyfind(Food, 2, Nbr).
+
+is_empty(Nbr) ->
+	lists:keyfind(empty, 2, Nbr).
 
 test() -> 
 	driver ! {step}.
@@ -589,7 +614,7 @@ lookAround (State,Nbr) ->
 	element(1, lists:nth(8, Nbr)) ! {vision, AnimalType, se, VisionRange, [], DataCollector}.
 
 visionDataCollector (8, _AnimalType, {BestDir, BestVal}, {WorstDir, WorstVal}, To) ->
-	case (WorstVal >= BestVal) of
+	case (abs(WorstVal) >= BestVal) of
 		true ->
 			case WorstDir of
 				n ->
@@ -659,7 +684,6 @@ carnivoreProspect ([{Object, Range} | Rest], Acc) ->
 
 
 broadcast(Nbr,Type,From) ->
-	%%io:format("I (~p) try to broadcast ~p to:~p!~n",[From, Type, Nbr]),
 	{C,R} = From,
 	Name = list_to_atom("x" ++ integer_to_list(C) ++ "y" ++ integer_to_list(R)),
 	lists:map(fun({X,_}) -> X ! {new_type, Type, Name} end, Nbr).

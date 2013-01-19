@@ -6,7 +6,6 @@ init() ->
         frame:init(),
         register(driver, spawn(?MODULE, loop, [[],[],0,0])).
  
- 
 parse_binary_inner(<<>>,Ack,_,_) -> Ack;
 parse_binary_inner(<<Byte:8, Rest/binary>>, Ack, X, Y) ->
         case Byte of
@@ -50,7 +49,6 @@ loop(P, E, W, H) ->
                         Entities = parse_binary(Binary,Wn),
                         spawn_game(Entities, Wn, Hn),
                         Pids = to_pid(Entities),
-                        lists:map(fun(X) -> gen_server:cast(X, broadcast) end, Pids),
                         driver:loop(Pids, Entities, Wn, Hn);
                 {restart} ->
                         spawn_game(E, W, H),
@@ -113,3 +111,6 @@ step() ->
 
 setup() ->
 	driver ! {set_up, "test.txt", 27, 27}.
+
+setup2() ->
+	driver ! {set_up, "test2.txt", 68, 34}.
