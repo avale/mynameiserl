@@ -17,6 +17,10 @@ parse_binary_inner(<<Byte:8, Rest/binary>>, Ack, X, Y) ->
                 35 -> parse_binary_inner(Rest, [{X,Y,-1}|Ack], X+1, Y);
                 _ -> parse_binary_inner(Rest, Ack, X+1, Y)
         end.
+
+parse_binary_outer([], Ack, _) -> Ack;
+parse_binary_outer([H|T], Ack, Y) -> 
+        parse_binary_outer(T, parse_binary_inner(H,Ack,0,Y),Y+1).
  
 parse_binary_outer(<<>>, Ack, _, _) -> Ack;
 parse_binary_outer(Board, Ack, Y, W) ->
@@ -31,6 +35,9 @@ parse_binary_outer(Board, Ack, Y, W) ->
  
 parse_binary(Binary,W) ->
         parse_binary_outer(Binary,[],0,W).
+
+parse_binary_list(Binaries) ->
+        parse_binary_outer(Binaries, [], 0).
  
 spawn_game([], _W, _H) -> ok;
 spawn_game([{Xe,Ye,C}|T], W, H) ->
@@ -42,14 +49,13 @@ to_pid(L) ->
  
 loop(P, E, W, H) ->
         receive
-                {set_up, File, Wn, Hn} ->
+				{set_up, File, Wn, Hn} ->
                         frame:set_w(Wn),
                         frame:set_h(Hn),
-                        {ok, Binary} = file:read_file(File),
-                        Entities = parse_binary(Binary,Wn),
+                        Binary = read_file:read(File),
+                        Entities = parse_binary_list(Binary),
                         spawn_game(Entities, Wn, Hn),
-                        Pids = to_pid(Entities),
-                        driver:loop(Pids, Entities, Wn, Hn);
+                        driver:loop(to_pid(Entities), Entities, Wn, Hn);
                 {restart} ->
                         spawn_game(E, W, H),
                         register(clock, spawn(?MODULE, tick, [P])),
@@ -113,4 +119,4 @@ setup() ->
 	driver ! {set_up, "test.txt", 27, 27}.
 
 setup2() ->
-	driver ! {set_up, "test2.txt", 68, 34}.
+	driver ! {set_up, "test2.txt", 68, 66}.

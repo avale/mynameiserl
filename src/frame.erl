@@ -119,7 +119,7 @@ default_setup() ->
     set_w(20),
     set_h(10),
     set_head("Simple smart pasture"),
-    set_foot("Copy pasture").
+    set_foot("<h1>Circle of Life - Pasture Simulation</h1>&copy; 2013 Andreas Valeg&aring;rd, Carl Ekman, Joakim Ejenstam").
 
 cellpadding() ->
     10.
